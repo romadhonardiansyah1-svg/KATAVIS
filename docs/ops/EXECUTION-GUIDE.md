@@ -600,11 +600,31 @@ Laporkan daftar file yang berubah.
 
 ### Kapan pakai frontier vs biasa
 
-| Model | Untuk langkah |
-|---|---|
-| **Frontier** (Opus, GPT-5.6 Sol) | 1, 2, 3, 4, 10, 13 |
-| Menengah (Sonnet, GPT-5.6 Luna) | 5, 6, 7, 8, 9, 11, 14 |
-| Biasa (Haiku, GPT-4.1) | 12, 15 |
+**Rekomendasi: DeepSeek V4.1 Flash untuk seluruh langkah.**
+
+V4.1 Flash (#1 di DeepSWE 74.2%, Terminal-Bench 2.1 90.6%, AutomationBench 54.8%) mengalahkan
+Claude Opus 5.0 dan GPT-5.6 Sol pada benchmark agentic coding, dengan harga 100x lebih murah.
+
+Guardrail yang sudah terpasang (AGENTS.md, API-CONTRACT, lib/errors.ts, lib/schemas.ts,
+eslint boundaries, tools/contrast.py, tools/check_refs.py, 152 unit test) mengkompensasi
+kelemahan model pada tugas sangat sulit.
+
+**Satu pengecualian:** langkah 10 (Accessibility Mode) membutuhkan verifikasi manual ekstra
+karena tidak ada bukti V4.1 Flash dilatih khusus untuk WCAG/ARIA. Jalankan:
+```
+pnpm run test:e2e:a11y
+python tools/contrast.py
+```
+Dan uji TalkBack secara manual di perangkat Android fisik.
+
+**Anti-halusinasi:** tambahkan di awal SETIAP prompt:
+```
+JANGAN mengarang endpoint, error code, atau skema yang tidak ada di dokumen.
+Semua bentuk API ada di docs/spec/API-CONTRACT.md.
+Semua error code ada di lib/errors.ts.
+Semua skema Zod ada di lib/schemas.ts.
+Kalau Anda butuh yang belum ada, TANYA — jangan buat sendiri.
+```
 
 ### Tanda hasil agen perlu DITOLAK
 
