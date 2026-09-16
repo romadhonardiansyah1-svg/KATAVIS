@@ -1,0 +1,67 @@
+﻿{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "katavis",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "katavis",
+      "database_id": "PLACEHOLDER_ISI_SETELAH_wrangler_d1_create",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "katavis-media"
+    }
+  ],
+
+  "queues": {
+    "producers": [
+      {
+        "queue": "katavis-jobs",
+        "binding": "JOBS"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "katavis-jobs",
+        "dead_letter_queue": "katavis-jobs-dlq",
+        "max_batch_size": 5,
+        "max_retries": 3,
+        "retry_delay": 30
+      }
+    ]
+  },
+
+  "ai": {
+    "binding": "AI",
+    // Workers AI selalu mengakses sumber daya remote, termasuk saat dev lokal.
+    // Ditandai eksplisit agar pemakaian kuota tidak mengejutkan. Lihat R-06.
+    "remote": true
+  },
+
+  "vars": {
+    "ENVIRONMENT": "development",
+    "GEMINI_ENABLED": "false",
+    "DEMO_MODE": "false",
+    "GEMINI_TIMEOUT_MS": "45000",
+    "AGENT_HEARTBEAT_TIMEOUT_MS": "30000"
+  }
+
+  // Rahasia diatur lewat `wrangler secret put`, tidak pernah di berkas ini:
+  //   GROQ_API_KEY
+  //   NINEROUTER_API_KEY
+  //   AGENT_SHARED_KEY
+  //   JWT_SIGNING_KEY
+  //   OTP_PROVIDER_KEY
+}

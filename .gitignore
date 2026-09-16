@@ -1,0 +1,50 @@
+# Dependensi
+node_modules/
+.pnpm-store/
+
+# Build
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Cloudflare
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Rahasia — tidak pernah masuk repositori
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Profil Chrome Studio Agent — memuat sesi login Google
+agent/chrome-profile/
+agent/.session
+
+# Hasil pengujian
+coverage/
+test-results/
+playwright-report/
+e2e-results.json
+reports/
+.stryker-tmp/
+
+# Aset demo yang di-cache (besar, di-generate ulang)
+demo-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.pyc

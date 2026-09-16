@@ -1,0 +1,12 @@
+﻿# Paket yang boleh menjalankan skrip build saat dipasang.
+# Ketiganya membutuhkan biner native dan tidak berfungsi tanpanya.
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  workerd: true
+
+# Versi yang lebih baru dari ambang usia rilis bawaan pnpm, tetapi
+# sengaja dipakai karena dibutuhkan runtime Cloudflare terbaru.
+minimumReleaseAgeExclude:
+  - '@cloudflare/workers-types@5.20260916.1'
+  - '@types/node@22.20.3'
