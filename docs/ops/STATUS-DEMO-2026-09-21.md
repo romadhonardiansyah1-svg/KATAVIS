@@ -15,6 +15,7 @@ pemastian alur utama berjalan stabil end-to-end.
 | E2E `android-chrome` | 121 lulus / 2 dilewati / **3 gagal** | **126 lulus / 0 gagal / 0 dilewati** |
 | E2E `reduced-motion` (aksesibilitas) | — | **21 lulus** |
 | E2E seluruh empat peramban | 4 gagal | **398 lulus / 1 dilewati jujur / 0 gagal** |
+| Riwayat git | **0 commit**, 209 berkas ter-stage | **2 commit**, ruang kerja bersih |
 
 `typecheck` bersih. `lint` bersih. Kontras 16 pasangan sesuai `DESIGN.md`. 136 rujukan silang
 ID kasus uji menunjuk sasaran yang ada.
@@ -136,8 +137,26 @@ terpakai. Periksa denyut agen di H-0.
 - Login sekali-jalan Gemini di profil Chrome Studio Agent.
 - `gitleaks` belum pernah benar-benar dijalankan (Docker tidak ada di mesin ini), meski
   konfigurasinya sudah benar.
-- Kebersihan repositori: `.tmp-fix.py`, `.tmp-fix2.py`, dan status `.workbuddy-ai/`; repositori
-  masih belum punya satu pun commit meski 200+ berkas sudah ter-*stage*.
+
+### 3.5 Kebersihan repositori — selesai
+
+Keadaan awal: **nol commit**, 209 berkas ter-stage. Ruang kerja tanpa riwayat tidak dapat
+di-`revert` saat demo rusak di panggung, jadi ini diperlakukan sebagai prioritas tertinggi
+setelah gerbang pengujian.
+
+- `.tmp-fix.py` dan `.tmp-fix2.py` dihapus — skrip sekali pakai yang docstring-nya sendiri
+  berbunyi "Dijalankan sekali, lalu berkasnya dihapus", dan perubahannya sudah terpasang.
+  `.gitignore` diberi pola `.tmp-*`/`tmp-*` supaya tidak terulang.
+- Rahasia diperiksa **sebelum** commit dengan memindai blob ter-stage untuk pola `sk-`, `gsk_`,
+  `AKIA`, dan kunci privat PEM. Hasilnya bersih; `.dev.vars`, `agent/chrome-profile/`, dan
+  `*.pem`/`*.key` sudah diabaikan sejak awal.
+- `.workbuddy-ai/` ikut di-commit: isinya hanya catatan memori dan rencana, seluruhnya
+  dokumentasi proyek, tanpa rahasia.
+- Dua commit dipisah menurut maksud: commit pertama memuat seluruh proyek, commit kedua memuat
+  perubahan yang tertinggal dari sesi sebelumnya (parameter `?locale=`, perbaikan CI, overrides
+  kerentanan) agar commit pertama tidak mengabur.
+
+Sesudahnya: `git status` bersih, dan `git revert` serta `git diff` akhirnya bekerja.
 
 ---
 
@@ -152,16 +171,15 @@ Urutan berdasarkan nilai, bukan kelengkapan.
 2. **`wrangler login` lalu penyediaan jarak jauh.** D1, R2, Queues, dan rahasia produksi. Ini
    membuka W5 di rencana eksekusi yang tertunda menunggu pemilik.
 
-3. **Simpan pekerjaan dengan commit pertama.** Repositori ini belum punya satu pun commit meski
-   lebih dari dua ratus berkas sudah ter-*stage*. Ruang kerja tanpa riwayat adalah ruang kerja
-   yang tidak dapat di-`revert` saat demo rusak.
-
-4. **Jalankan `gitleaks` di CI yang punya Docker** untuk memastikan konfigurasi
+3. **Jalankan `gitleaks` di CI yang punya Docker** untuk memastikan konfigurasi
    `.gitleaks.toml` benar-benar bekerja, bukan hanya terpasang.
 
-5. **Perluas `TC-E2E-26` ke layar katalog selesai.** Kasus uji yang ada memverifikasi peristiwa
-   "Foto tersimpan"; peristiwa "Katalog selesai" sudah diimplementasikan tetapi belum diuji
-   end-to-end.
+4. **Perluas `TC-E2E-26` ke peristiwa "Katalog selesai".** Kasus uji yang ada memverifikasi
+   peristiwa "Foto tersimpan"; peristiwa "Katalog selesai" sudah diimplementasikan tetapi belum
+   diuji end-to-end.
+
+5. **Dorong riwayat ke remote.** Commit pertama sudah ada di mesin ini, tetapi belum ada remote:
+   satu cakram rusak dan seluruh riwayatnya hilang bersama mesinnya.
 
 ---
 
