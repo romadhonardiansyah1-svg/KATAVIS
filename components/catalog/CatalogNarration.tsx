@@ -21,6 +21,15 @@ import { fetchPublicCatalog } from "./api";
 export interface CatalogNarrationProps {
   readonly slug: string;
   readonly initialCatalog: PublicCatalog;
+  /**
+   * Bahasa isi `initialCatalog`, apa adanya dari server (`data.locale`).
+   *
+   * Diberikan terpisah, bukan disimpulkan dari `availableLocales[0]`:
+   * halaman dapat dibuka dengan `?locale=ja`, dan menyoroti pilihan
+   * pertama akan menandai bahasa yang salah sebagai yang sedang terbuka —
+   * pemilih bahasa yang berbohong tentang keadaannya sendiri.
+   */
+  readonly initialLocale: string;
 }
 
 const LOCALE_LABEL: Readonly<Record<string, string>> = {
@@ -38,9 +47,10 @@ function labelOf(locale: string): string {
 export function CatalogNarration({
   slug,
   initialCatalog,
+  initialLocale,
 }: CatalogNarrationProps): React.JSX.Element {
   const [catalog, setCatalog] = useState(initialCatalog);
-  const [locale, setLocale] = useState<string | null>(initialCatalog.availableLocales[0] ?? null);
+  const [locale, setLocale] = useState<string | null>(initialLocale);
   const [isSwitching, setIsSwitching] = useState(false);
   const [failedLocale, setFailedLocale] = useState<string | null>(null);
 
@@ -50,13 +60,16 @@ export function CatalogNarration({
     setIsSwitching(true);
     setFailedLocale(null);
 
-    // Seluruh versi bahasa datang dari endpoint yang sama. Kunci bahasanya
-    // tidak dikirim sebagai kueri di kontrak API bagian 10, jadi yang
-    // diterima adalah versi bawaan titik akhir; `availableLocales` tetap
-    // ditampilkan supaya pembeli tahu versi mana yang ada, dan supaya
-    // ketiadaannya terlihat sebagai kekurangan data, bukan sebagai tombol
-    // yang diam.
-    const response = await fetchPublicCatalog(slug);
+    // Versi bahasa diminta lewat parameter `locale` (kontrak API bagian 10).
+    // Sebelum parameter itu ada, pemilih ini meminta versi bawaan titik akhir
+    // dan menampilkan hasil yang sama untuk setiap pilihan — teksnya berubah
+    // label, isinya tidak.
+    //
+    // Yang dijadikan penanda bukan `next` melainkan bahasa yang benar-benar
+    // dijawab server (`data.locale`). Server berhak menjawab dengan bahasa
+    // lain apabila yang diminta tidak ada di basis data; mempercayai `next`
+    // akan menyoroti pilihan yang isinya tidak sedang tampil.
+    const response = await fetchPublicCatalog(slug, next);
 
     setIsSwitching(false);
 
@@ -66,8 +79,12 @@ export function CatalogNarration({
     }
 
     setCatalog(response.data);
-    setLocale(next);
+    setLocale(response.data.locale);
   }
+
+  // Bahasa penanda pada pemutarnya juga mengikuti jawaban server, bukan
+  // pilihan yang ditekan. Kalau tidak, suara perangkat dapat membaca naskah
+  // Inggris dengan aturan pelafalan bahasa lain.
 
   return (
     <>
@@ -86,7 +103,13 @@ export function CatalogNarration({
                     className={
                       isCurrent ? "localePicker__option localePicker__option--current" : "localePicker__option"
                     }
-                    aria-current={isCurrent ? "true" : undefined}
+                    // `aria-pressed`, bukan `aria-current`: ini tombol yang
+                    // menyalakan/mematikan dirinya sendiri, bukan posisi
+                    // pengguna di dalam sebuah alur navigasi. Pembaca layar
+                    // menyebut "terpilih" untuk `aria-pressed`, sedangkan
+                    // `aria-current` disebut "halaman saat ini" — bunyi yang
+                    // salah untuk pemilih bahasa.
+                    aria-pressed={isCurrent}
                     aria-busy={isSwitching && !isCurrent}
                     disabled={isSwitching}
                     lang={available}
@@ -117,6 +140,7 @@ export function CatalogNarration({
         key={locale ?? "id"}
         narration={catalog.narration}
         availableLocales={catalog.availableLocales}
+        locale={catalog.locale}
         artisanName={catalog.artisan.displayName}
       />
     </>

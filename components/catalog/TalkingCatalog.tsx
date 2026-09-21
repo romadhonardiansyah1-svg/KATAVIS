@@ -61,12 +61,21 @@ export function usePrefersReducedMotion(): boolean {
 export interface TalkingCatalogProps {
   readonly narration: Narration;
   readonly availableLocales: readonly string[];
+  /**
+   * Bahasa isi `narration`, apa adanya dari server.
+   *
+   * Lebih dipercaya daripada menebaknya dari isi teks: naskah Jepang dan
+   * Mandarin sama-sama memuat aksara non-Latin, dan `availableLocales[0]`
+   * tidak menjanjikan apa pun soal urutan.
+   */
+  readonly locale: string;
   readonly artisanName: string;
 }
 
 export function TalkingCatalog({
   narration,
   availableLocales,
+  locale,
   artisanName,
 }: TalkingCatalogProps): React.JSX.Element | null {
   const [wantsAudio, setWantsAudio] = useState(false);
@@ -78,6 +87,7 @@ export function TalkingCatalog({
   const narrationState = useNarration({
     narration,
     availableLocales,
+    locale,
     wantsAudio,
     cueMode: false,
     onActiveIndexChange: setActiveIndex,

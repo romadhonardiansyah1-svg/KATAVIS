@@ -21,6 +21,14 @@ export default tseslint.config(
       "playwright-report/**",
       "test-results/**",
       ".stryker-tmp/**",
+      // Profil Chrome Studio Agent memuat bundel ekstensi pihak ketiga —
+      // ribuan berkas yang bukan kode proyek ini. Direktorinya sudah
+      // diabaikan git untuk alasan yang sama.
+      "agent/chrome-profile/**",
+      // Keluaran Playwright (artefak, laporan HTML) dan log jalannya
+      // pengujian. Direktori ini dikonfigurasi di playwright.config.ts dan
+      // diabaikan git; meng-lint-nya berarti meng-lint berkas yang dibuang.
+      "test-output/**",
     ],
   },
 

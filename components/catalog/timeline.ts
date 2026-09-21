@@ -59,6 +59,16 @@ export const PublicCatalogSchema = z.object({
   media: z.array(CatalogMediaSchema),
   narration: NarrationSchema,
   availableLocales: z.array(z.string()),
+  /**
+   * Bahasa yang benar-benar dilayani pada respons ini.
+   *
+   * Ada di kontrak API bagian 10. Diperlukan karena `availableLocales`
+   * hanya menyebut bahasa apa saja yang tersedia — ia tidak menyebut mana
+   * yang sedang dibuka, dan urutannya tidak menjanjikan apa pun. Tanpa
+   * bidang ini, pemilih bahasa akan menyoroti pilihan yang salah ketika
+   * halaman dibuka dengan `?locale=ja`.
+   */
+  locale: z.string(),
 });
 
 export type Caption = z.infer<typeof CaptionSchema>;

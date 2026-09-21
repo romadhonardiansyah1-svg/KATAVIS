@@ -16,6 +16,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Gitleaks menelusuri riwayat commit, bukan hanya pohon kerja.
+          # Checkout dangkal bawaan aksi ini hanya membawa satu commit
+          # sehingga riwayat lama tidak pernah tersapu.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -46,8 +51,27 @@ jobs:
       - name: Cross-reference verification
         run: python tools/check_refs.py
 
+      # `|| true` DIHAPUS dengan sengaja. Sebelumnya langkah ini selalu
+      # hijau apa pun hasilnya, sehingga kerentanan tinggi tidak pernah
+      # menggagalkan apa pun — dan `pnpm audit` memang menemukan `sharp`
+      # serta `qs` yang rentan, yang baru tertangkap setelah diperiksa
+      # manual. Ambangnya `high`: `moderate` pada dependensi pengembangan
+      # muncul jauh lebih sering daripada dapat ditindaklanjuti, dan gerbang
+      # yang berisik akan dimatikan orang.
       - name: Dependency audit
-        run: npm audit --audit-level=high || true
+        run: pnpm audit --audit-level=high
+
+      # Rahasia yang ter-commit tidak dapat ditarik kembali dengan
+      # menghapusnya di commit berikutnya — ia tetap ada di riwayat. Karena
+      # itu diperiksa pada setiap perubahan, bukan sesekali.
+      #
+      # `fetch-depth: 0` diperlukan: gitleaks menelusuri riwayat, dan
+      # checkout dangkal bawaan aksi ini hanya membawa satu commit.
+      - name: Secret scan
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo --config=/repo/.gitleaks.toml --redact --verbose
 
   integration:
     runs-on: ubuntu-latest
@@ -103,5 +127,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          # Playwright menulis laporan HTML ke `test-output/html`
+          # (`playwright.config.ts`). Sebelumnya langkah ini menunjuk
+          # `playwright-report/`, yang tidak pernah dibuat oleh konfigurasi
+          # mana pun — jadi unggahannya selalu kosong, dan tidak ada yang
+          # menyadarinya sampai diperiksa manual.
+          path: |
+            test-output/html/
+            test-output/results.json
           retention-days: 14

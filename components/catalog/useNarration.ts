@@ -79,6 +79,13 @@ export interface NarrationInput {
   readonly narration: Narration;
   /** Dipakai untuk memilih kode bahasa suara perangkat. */
   readonly availableLocales: readonly string[];
+  /**
+   * Bahasa naskah menurut server, bila ada.
+   *
+   * Opsional supaya pemanggil lama tetap bekerja; bila kosong, bahasanya
+   * ditebak dari isi teks seperti sebelumnya.
+   */
+  readonly locale?: string;
   /** Audio hanya dilampirkan dan dibunyikan setelah pembeli menekan tombol. */
   readonly wantsAudio: boolean;
   /** Setiap kalimat dibacakan berurutan, bukan sebagai satu penggalan. */
@@ -94,8 +101,15 @@ export interface NarrationInput {
  * Urutan larik itu datang dari basis data dan tidak menjanjikan apa pun;
  * mengandalkannya berarti narasi berbahasa Inggris dapat dibacakan dengan
  * aturan pelafalan Indonesia.
+ *
+ * Yang paling dipercaya adalah `locale` dari server (kontrak API bagian
+ * 10): server tahu persis baris mana yang dilayaninya, dan tebakan dari
+ * teks hanya perkiraan. Tebakan itu tetap dipakai bila `locale` tidak ada
+ * atau berisi kode yang tidak dapat dipakai.
  */
 function scriptLanguage(input: NarrationInput): string {
+  if (input.locale !== undefined && input.locale.length > 0) return languageOf(input.locale);
+
   const tagged = input.narration.captions.find((caption) => isIndonesianLanguage(caption.text));
   if (tagged !== undefined) return languageOf("id");
 

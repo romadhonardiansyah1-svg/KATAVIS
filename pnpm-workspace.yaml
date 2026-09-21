@@ -10,3 +10,20 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@cloudflare/workers-types@5.20260916.1'
   - '@types/node@22.20.3'
+
+# Penambalan kerentanan pada dependensi turunan (dev-only).
+#
+# `pnpm audit` menemukan 1 tingkat tinggi dan 3 sedang, semuanya di rantai
+# perkakas uji — bukan di bundel Worker:
+#
+#   sharp >=0.35.4   kerentanan libheif (GHSA-g89c-p67h-r497)
+#                    lewat @cloudflare/vitest-pool-workers > miniflare > sharp
+#   qs    >=6.16.0   DoS yang dapat dipicu jarak jauh
+#                    lewat @stryker-mutator/core > typed-rest-client > qs
+#
+# Overrides, bukan dependensi baru: kedua paket sudah ada di pohon, hanya
+# versinya yang dinaikkan ke ambang tambalan. Diverifikasi dengan menjalankan
+# ulang uji unit dan uji integrasi (yang memakai miniflare) sesudahnya.
+overrides:
+  sharp: '>=0.35.4'
+  qs: '>=6.16.0'

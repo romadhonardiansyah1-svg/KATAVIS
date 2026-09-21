@@ -37,9 +37,16 @@ function failureOf(code: ErrorCode): CatalogFailure {
   return { code, message: entry.message, action: entry.action, workSafe: true };
 }
 
-/** Mengambil katalog publik milik `slug`. Tanpa autentikasi. */
-export async function fetchPublicCatalog(slug: string): Promise<CatalogResult> {
-  const url = `${API_BASE_URL}${API_PREFIX}/public/catalog/${encodeURIComponent(slug)}`;
+/**
+ * Mengambil katalog publik milik `slug`. Tanpa autentikasi.
+ *
+ * `locale` opsional (kontrak API bagian 10). Tanpa itu, server memakai
+ * versi bawaannya — yang terjadi pada setiap pembeli yang membuka tautan
+ * yang dibagikan lewat WhatsApp, karena tautan itu tidak membawa parameter.
+ */
+export async function fetchPublicCatalog(slug: string, locale?: string): Promise<CatalogResult> {
+  const query = locale === undefined ? "" : `?locale=${encodeURIComponent(locale)}`;
+  const url = `${API_BASE_URL}${API_PREFIX}/public/catalog/${encodeURIComponent(slug)}${query}`;
 
   let response: Response;
   try {
