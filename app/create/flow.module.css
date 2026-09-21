@@ -1,0 +1,383 @@
+/**
+ * Gaya alur enam langkah.
+ *
+ * Seluruh nilai berasal dari `tokens.css`. Tidak ada warna mentah, tidak ada
+ * ukuran yang diketik langsung: target sentuh memakai `--touch-min` sehingga
+ * profil Motorik dapat memperbesarnya tanpa menyentuh berkas ini, dan teks
+ * tubuh memakai `--text-body` sehingga profil Visual dapat memperbesarnya
+ * dengan cara yang sama.
+ *
+ * Gerak hanya dipakai untuk umpan balik status (MOTION 1), tidak untuk
+ * hiasan.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvh;
+  max-inline-size: 40rem;
+  margin-inline: auto;
+  padding: var(--space-4);
+  /* Ruang untuk tombol Accessibility Mode yang tetap di pojok kanan bawah.
+     Tanpa ini, ia menutupi aksi utama di layar sempit. */
+  padding-block-end: var(--space-16);
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* S2-05: posisi langkah selalu terlihat. */
+.stepIndicator {
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.01em;
+}
+
+.title {
+  font-size: var(--text-heading);
+  font-family: var(--font-story);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block-start: var(--space-4);
+  border-block-start: var(--border-width) solid var(--border);
+}
+
+/* --- Aksi utama: satu per layar --- */
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: var(--radius-surface);
+  background: var(--action);
+  color: var(--text-inverse);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.primaryButton:disabled {
+  background: var(--clay-200);
+  color: var(--clay-700);
+  cursor: not-allowed;
+}
+
+/* Aksi sekunder tidak boleh berbobot sama dengan aksi utama (S2-02). */
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-surface);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--text-body);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.secondaryLink:hover {
+  color: var(--text-primary);
+}
+
+/* --- Indikator penyimpanan: teks, bukan animasi berputar --- */
+
+.saveIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+}
+
+/* --- Galat: ikon + teks + langkah berikutnya --- */
+
+.errorBanner {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--danger);
+  border-radius: var(--radius-surface);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.errorIcon {
+  flex: none;
+  color: var(--danger);
+}
+
+.errorBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.errorAction {
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+}
+
+/* --- Status: ikon + teks + warna, tidak pernah warna saja --- */
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+}
+
+.statusIconSuccess {
+  color: var(--success);
+}
+
+.statusIconDanger {
+  color: var(--danger);
+}
+
+.statusIconAccent {
+  color: var(--accent);
+}
+
+/* --- Langkah 1: foto --- */
+
+.photoFrame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 5;
+  inline-size: 100%;
+  border: var(--border-width-strong) dashed var(--border-strong);
+  border-radius: var(--radius-surface);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+/* object-contain, bukan object-cover: memaksa crop persegi memotong karya. */
+.photoImage {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}
+
+/* --- Langkah 2: rekam --- */
+
+.recordArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding-block: var(--space-8);
+}
+
+.recordButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  inline-size: var(--touch-record);
+  block-size: var(--touch-record);
+  border: var(--border-width-strong) solid var(--action);
+  border-radius: var(--radius-pill);
+  background: var(--action);
+  color: var(--text-inverse);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.recordButton:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+
+.recordButton:disabled {
+  background: var(--clay-200);
+  color: var(--clay-700);
+  cursor: not-allowed;
+}
+
+.recordButtonActive {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.timer {
+  font-size: var(--text-display);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
+}
+
+.warningText {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--danger);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+
+/* --- Langkah 3 dan 5: menyunting teks --- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Label selalu terlihat, tidak pernah hanya placeholder. */
+.label {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-label);
+}
+
+.transcriptField {
+  inline-size: 100%;
+  min-block-size: 12rem;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-story);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+}
+
+.hint {
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* --- Langkah 4: kemajuan --- */
+
+.progressTrack {
+  inline-size: 100%;
+  block-size: var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.progressFill {
+  block-size: 100%;
+  background: var(--action);
+  transition: inline-size var(--duration-normal) var(--ease);
+}
+
+.progressLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+}
+
+/* --- Langkah 5 dan 6: kartu hasil --- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--bg-page);
+}
+
+.cardTitle {
+  font-size: var(--text-subhead);
+  font-family: var(--font-story);
+}
+
+.specList {
+  margin: 0;
+  padding-inline-start: var(--space-6);
+  font-size: var(--text-body);
+}
+
+/* --- Keadaan memuat --- */
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-12);
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+}
+
+/**
+ * Elemen yang hanya untuk pembaca layar atau untuk memicu dialog berkas.
+ *
+ * Bukan `display: none`: kontrol yang disembunyikan begitu tidak dapat
+ * difokuskan maupun dibacakan, dan pada sebagian peramban `input.click()`
+ * tidak berfungsi pada elemen yang tidak dirender sama sekali.
+ */
+.visuallyHidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Daftar tahap pemrosesan --- */
+
+.stageList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Label tombol rekam. Terlihat, bukan hanya untuk pembaca layar. */
+.recordLabel {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  text-align: center;
+}

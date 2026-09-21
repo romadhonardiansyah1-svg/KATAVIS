@@ -1,0 +1,346 @@
+# SOURCE: C:\Romadhon Data penting\Downloads\Fitur pendukung.pdf
+# PAGES: 9
+
+
+===== PAGE 1 =====
+Fitur pendukung yang saya rekomendasikan 
+No. Fitur Pendukung Fungsi Manfaat bagi Pengguna 
+Disabilitas 
+1 Accessibility Mode Mengatur tampilan sesuai 
+kebutuhan pengguna 
+Membantu pengguna dengan 
+gangguan penglihatan, motorik, 
+maupun kognitif 
+2 Navigasi Sederhana 
+/ Guided 
+Navigation 
+Memberikan panduan 
+langkah demi langkah 
+Pengguna tidak perlu 
+memahami banyak menu atau 
+alur aplikasi 
+3 Voice Navigation Navigasi menggunakan 
+perintah suara 
+Sangat membantu pengguna 
+dengan keterbatasan motorik 
+atau kesulitan mengetik 
+4 Screen Reader & 
+Text-to-Speech 
+Membacakan 
+teks/menu/hasil katalog 
+Membantu pengguna tunanetra 
+atau low vision 
+5 Subtitle & Visual 
+Indicator 
+Menampilkan teks pada 
+audio/video dan indikator 
+visual 
+Membantu pengguna tunarungu 
+6 High Contrast & 
+Font Adjustment 
+Mengubah kontras, 
+ukuran, dan jenis teks 
+Membantu pengguna low vision 
+7 Large Button / Easy 
+Touch 
+Tombol dibuat besar dan 
+mudah ditekan 
+Membantu pengguna dengan 
+keterbatasan motorik 
+8 Save Draft / Auto 
+Save 
+Menyimpan progres 
+otomatis 
+Pengguna tidak kehilangan 
+pekerjaan ketika terjadi 
+kesalahan atau keluar aplikasi 
+9 Keamanan Akun Login, OTP, session 
+management, recovery 
+Melindungi akun, produk, dan 
+data pengrajin 
+10 Role & Permission Memisahkan hak 
+pengrajin, pendamping, 
+admin, dan buyer 
+Pendamping dapat membantu 
+tanpa mengambil alih seluruh 
+akun 
+11 Pendamping / 
+Caregiver Access 
+Memungkinkan 
+pendamping membantu 
+proses penggunaan 
+Sangat relevan untuk pengrajin 
+yang membutuhkan bantuan 
+12 Notifikasi 
+Multimodal 
+Notifikasi berupa teks, 
+suara, dan visual 
+Tidak bergantung hanya pada 
+satu jenis informasi 
+13 Help / Tutorial 
+Interaktif 
+Tutorial penggunaan 
+dengan gambar, suara, dan 
+video 
+Membantu pengguna yang baru 
+menggunakan aplikasi 
+14 Error Assistance Memberikan pesan 
+kesalahan sederhana + 
+solusi 
+Mengurangi kebingungan 
+ketika terjadi kesalahan 
+15 Offline / Low 
+Connectivity Mode 
+Menyimpan input 
+sementara ketika internet 
+buruk 
+Membantu pengguna di daerah 
+dengan koneksi tidak stabil 
+1. Accessibility Mode — menurutku ini yang paling penting 
+Daripada membuat banyak pengaturan tersebar, KATAVIS bisa menyediakan tombol: 
+
+===== PAGE 2 =====
+♿ Mode Aksesibilitas 
+Di dalamnya pengguna bisa memilih kebutuhan: 
+ 👁️ Visual 
+ 👂 Pendengaran 
+ ✋ Motorik 
+ 🧠 Kognitif 
+ 🔊 Bantuan suara 
+Misalnya pengguna memilih Visual, sistem otomatis: 
+ memperbesar tulisan, 
+ meningkatkan kontras, 
+ mengaktifkan pembacaan teks, 
+ memberikan deskripsi alternatif pada gambar, 
+ memperbesar tombol. 
+Ini sangat sesuai dengan konsep proposal yang memang menyebut PWA ramah screen 
+reader dan komponen aksesibilitas WCAG 2.1 AAA. 
+ 
+2. Guided Navigation / Navigasi Bertahap 
+Karena target pengguna bisa memiliki keterbatasan tertentu, jangan membuat dashboard 
+terlalu kompleks. 
+Contohnya ketika pengguna ingin membuat katalog: 
+Langkah 1 
+📷 Foto Produk 
+"Arahkan kamera ke produk Anda." 
+↓ 
+Langkah 2 
+🎙️ Ceritakan Produk 
+"Tekan tombol dan ceritakan produk Anda." 
+↓ 
+Langkah 3 
+✨ Buat Katalog 
+"KATAVIS sedang membuat katalog Anda." 
+
+===== PAGE 3 =====
+↓ 
+Langkah 4 
+👀 Periksa Hasil 
+"Apakah katalog sudah sesuai?" 
+↓ 
+Langkah 5 
+🚀 Publikasikan 
+Jadi pengguna tidak harus memahami seluruh sistem sekaligus. 
+Ini sebenarnya merupakan pengembangan langsung dari konsep Low-Friction UI yang 
+sudah ada di proposal. 
+ 
+3. Voice Navigation 
+Proposal sudah menggunakan voice input untuk membuat storytelling. 
+Nah, kemampuan tersebut bisa diperluas. 
+Bukan hanya: 
+🎙️ "Ini cerita produk saya..." 
+tetapi juga: 
+"Buka produk saya." 
+"Buat katalog." 
+"Lanjut." 
+"Kembali." 
+"Simpan." 
+"Publikasikan." 
+Ini sangat membantu pengguna yang mengalami keterbatasan motorik sehingga sulit 
+melakukan banyak tap atau mengetik. 
+ 
+4. Screen Reader + Text-to-Speech 
+Ini penting terutama untuk pengguna tunanetra/low vision. 
+Contohnya ketika membuka katalog: 
+
+===== PAGE 4 =====
+🔊 "Nama produk: Tas Kulit Nusantara. Bahan: kulit sapi. Harga: Rp250.000. Dibuat oleh 
+pengrajin difabel..." 
+Jadi informasi katalog tidak hanya disampaikan secara visual. 
+Menariknya, Talking-Catalog yang sudah menjadi fitur utama KATAVIS sebenarnya dapat 
+menjadi bagian dari ekosistem aksesibilitas ini. Proposal memang sudah merancang katalog 
+dengan voice-over dan avatar. 
+ 
+5. Subtitle dan Visual Indicator 
+Untuk pengguna tunarungu, informasi audio harus mempunyai alternatif visual. 
+Misalnya Talking-Catalog: 
+🎥 Avatar berbicara 
+↓ 
+Subtitle otomatis 
+"Tas ini dibuat menggunakan kulit sapi pilihan dan dikerjakan secara manual oleh 
+pengrajin..." 
+Kemudian notifikasi juga jangan hanya berupa suara. 
+❌ "Berhasil!" melalui audio saja. 
+Lebih baik: 
+✅ ✓ Produk berhasil dibuat 
+ visual indicator 
+ optional voice notification. 
+ 
+6. Fitur Pendamping / Caregiver Access ⭐⭐⭐⭐⭐ 
+Nah, ini menurutku fitur yang sangat cocok untuk KATAVIS dan cukup menarik kalau 
+dibawa ke presentasi lomba. 
+Proposal sendiri menyebut bahwa aktor sistem terdiri dari pengrajin difabel atau 
+pendamping SLB, selain buyer dan admin. 
+Maka bisa dibuat: 
+"Mode Pendamping" 
+
+===== PAGE 5 =====
+Misalnya: 
+Pengrajin 
+ membuat produk 
+ merekam cerita 
+ melihat katalog 
+Pendamping 
+ membantu mengedit 
+ membantu mengunggah 
+ membantu melakukan verifikasi 
+ membantu mengelola produk 
+Tetapi pendamping tidak otomatis mempunyai akses penuh ke akun. 
+Contohnya: 
+Pengrajin: Irsyad 
+Pendamping: Pendamping SLB 
+Status: 🧠 Terhubung 
+Pengrajin dapat mencabut akses kapan saja. 
+Ini sekaligus bisa dikombinasikan dengan Role & Permission. 
+ 
+7. Keamanan Akun 
+Ini juga wajib, apalagi KATAVIS nantinya menyimpan: 
+ data pengguna, 
+ foto produk, 
+ rekaman suara, 
+ video avatar, 
+ informasi produk, 
+ data pesanan, 
+ data pembayaran, 
+ log aktivitas. 
+Proposal sendiri sudah menempatkan API Gateway sebagai pintu masuk untuk autentikasi, 
+hak akses, dan keamanan request, serta menyimpan data pengguna, produk, pesanan, dan 
+log aktivitas. 
+Fitur keamanan yang bisa ditambahkan di sisi aplikasi: 
+🔐 Account Security 
+
+===== PAGE 6 =====
+ Login dengan email/nomor HP 
+ OTP 
+ Password/PIN 
+ Forgot Password 
+ Session timeout 
+ Logout dari semua perangkat 
+ Konfirmasi sebelum menghapus produk 
+ Riwayat aktivitas akun 
+ Role-based access control 
+ Persetujuan akses pendamping 
+Untuk pengguna dengan keterbatasan kognitif, PIN 4–6 digit bisa menjadi alternatif login 
+yang lebih sederhana daripada password kompleks. 
+ 
+8. Auto Save / Save Draft 
+Ini kelihatannya sederhana, tetapi sangat berguna. 
+Bayangkan pengrajin sudah: 
+📷 mengambil foto 
+🎙️ merekam cerita 30 detik 
+⏳ AI sedang memproses... 
+Kemudian: 
+❌ koneksi internet terputus. 
+Jangan sampai semuanya hilang. 
+Sistem sebaiknya otomatis membuat: 
+Draft Produk "Tas Kulit Nusantara" 
+Progress: 70% 
+[Lanjutkan] 
+Ini juga cocok dengan arsitektur KATAVIS yang menggunakan task queue dan pemrosesan 
+AI secara paralel. 
+ 
+9. Error Assistance 
+Jangan memberikan error teknis seperti: 
+Error 500: Internal Server Error 
+
+===== PAGE 7 =====
+Untuk pengguna, lebih baik: 
+⚠️ Foto belum berhasil diproses 
+Jangan khawatir, foto Anda tetap tersimpan. 
+[Coba Lagi] 
+Atau: 
+🎙️ Suara belum terdengar jelas. 
+Silakan rekam kembali di tempat yang lebih tenang. 
+[Rekam Ulang] 
+Ini sangat penting untuk konsep low-friction. 
+ 
+10. Notifikasi Multimodal 
+Notifikasi KATAVIS sebaiknya tidak hanya mengandalkan teks. 
+Contohnya: 
+Produk selesai diproses 
+🔔 Visual → notifikasi 
+🔊 Audio → "Produk Anda sudah selesai." 
+📳 Haptic → getaran (jika perangkat mendukung) 
+Dengan begitu pengguna tidak bergantung pada satu indera saja. 
+ 
+Kalau dibuat menjadi struktur fitur KATAVIS 
+Menurutku struktur yang paling rapi untuk laporan/presentasi adalah seperti ini: 
+A. Fitur Utama 
+1. 3D Studio Mockup Enhancer 
+2. Voice-to-Story Generator 
+3. Talking-Catalog & AI Avatar 
+4. Global Listing & Export Hub 
+Ini memang sudah sesuai proposal. 
+B. Fitur Pendukung Aksesibilitas 
+1. Accessibility Mode 
+2. Guided Navigation 
+
+===== PAGE 8 =====
+3. Voice Navigation 
+4. Screen Reader & Text-to-Speech 
+5. Subtitle & Visual Indicator 
+6. High Contrast & Font Adjustment 
+7. Large Button / Easy Touch 
+8. Multimodal Notification 
+C. Fitur Pendukung Pengguna 
+1. Pendamping / Caregiver Access 
+2. Role & Permission 
+3. Tutorial Interaktif 
+4. Error Assistance 
+5. Auto Save / Save Draft 
+6. Offline / Low Connectivity Mode 
+D. Fitur Keamanan 
+1. Login & OTP 
+2. PIN / Password 
+3. Session Management 
+4. Role-Based Access Control 
+5. Activity Log 
+6. Data & Media Protection 
+7. Logout All Devices 
+ 
+💡 Kalau untuk KATAVIS sendiri, 5 fitur tambahan yang paling "worth it" 
+Kalau kalian tidak ingin terlalu banyak fitur karena bisa membuat scope proyek 
+melebar, aku akan memilih: 
+Prioritas Fitur Alasan 
+🥇 Accessibility Mode Fondasi inklusivitas seluruh aplikasi 
+🥈 Guided Navigation Membuat alur penggunaan sangat sederhana 
+🥉 Pendamping + Role 
+Permission 
+Sangat relevan dengan pengrajin 
+difabel/pendamping SLB 
+4 Voice Navigation Memperkuat konsep voice-first KATAVIS 
+5 Auto Save + Error 
+Assistance 
+Mencegah pengguna kehilangan pekerjaan dan 
+kebingungan 
+Dengan begitu, KATAVIS bukan hanya "aplikasi AI untuk membuat katalog", tetapi bisa 
+diposisikan sebagai: 
+Platform pemasaran digital inklusif yang memungkinkan pengrajin difabel membuat, 
+mengelola, dan mempromosikan produk secara mandiri dengan bantuan AI dan 
+teknologi aksesibilitas. 
+
+===== PAGE 9 =====
+Menurutku positioning terakhir ini lebih kuat untuk menjelaskan nilai KATAVIS, karena 
+proposal kalian memang sejak awal menempatkan masalahnya pada digital accessibility gap 
+dan kemandirian ekonomi pengrajin difabel. 
+ 

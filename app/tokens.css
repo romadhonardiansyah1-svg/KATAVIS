@@ -1,0 +1,142 @@
+/**
+ * Token desain KATAVIS.
+ *
+ * Sumber kebenaran tunggal untuk warna, tipografi, spasi, dan bentuk.
+ * Cerminan `docs/design/DESIGN-SYSTEM.md` dalam bentuk CSS.
+ *
+ * Menulis nilai warna mentah di komponen dilarang. Gunakan token.
+ * Menambah warna baru menuntut menjalankan `python tools/contrast.py`,
+ * dan skrip itu akan gagal bila angkanya tidak cocok dengan DESIGN.md.
+ */
+
+:root {
+  /* --- Permukaan: diturunkan dari material kriya nyata --- */
+  --clay-900: #2e1f17; /* tanah liat Kasongan setelah dibakar */
+  --clay-700: #5a3e2b; /* kulit samak nabati */
+  --clay-200: #e8dccf; /* kertas daluang */
+  --clay-50: #faf6f0;  /* kapas mentah */
+
+  /* --- Aksi --- */
+  --indigo-800: #1f3a5f; /* indigo celupan ke-7 */
+  --indigo-600: #2e5a8a; /* indigo celupan ke-3 */
+
+  /* --- Aksen dan status --- */
+  --rattan-500: #b8834a; /* rotan manau kering */
+  --moss-700: #3d5a3d;   /* daun jati muda */
+  --rust-700: #8b3a2f;   /* mengkudu */
+
+  /* --- Peran semantik --- */
+  --bg-page: var(--clay-50);
+  --bg-surface: var(--clay-200);
+  --bg-inverse: var(--clay-900);
+  --text-primary: var(--clay-900);
+  --text-secondary: var(--clay-700);
+  --text-inverse: var(--clay-50);
+  --action: var(--indigo-800);
+  --action-hover: var(--indigo-600);
+  --border: var(--clay-200);
+  --border-strong: var(--clay-700);
+  --focus-ring: var(--indigo-600);
+  --success: var(--moss-700);
+  --danger: var(--rust-700);
+  --accent: var(--rattan-500);
+
+  /* --- Tipografi --- */
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --font-story: "Lora", Georgia, serif;
+
+  --text-display: 2.25rem;  /* 36px */
+  --text-heading: 1.5rem;   /* 24px */
+  --text-subhead: 1.25rem;  /* 20px */
+  --text-body-lg: 1.25rem;  /* 20px, profil Visual */
+  --text-body: 1.125rem;    /* 18px, minimum teks tubuh */
+  --text-small: 1rem;       /* 16px, batas bawah mutlak */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.3;
+  --leading-normal: 1.4;
+  --leading-label: 1.5;
+  --leading-relaxed: 1.6;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* --- Spasi: delapan nilai, tidak lebih --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* --- Bentuk --- */
+  --radius-input: 4px;
+  --radius-surface: 8px;
+  --radius-pill: 999px;
+
+  --shadow-raised: 0 1px 3px rgb(46 31 23 / 12%);
+
+  --border-width: 1px;
+  --border-width-strong: 2px;
+
+  /* --- Target sentuh ---
+   * WCAG 2.1 SC 2.5.5 (Level AAA) menetapkan 44px. Kami memakai 56px
+   * karena pengguna sasaran mencakup penyandang keterbatasan motorik. */
+  --touch-min: 56px;
+  --touch-comfortable: 64px;
+  --touch-motor: 72px;
+  --touch-record: 96px;
+  --touch-gap: 8px;
+  --touch-gap-motor: 16px;
+
+  /* --- Gerak: MOTION 1, hanya umpan balik status --- */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Profil Visual: teks dan target lebih besar.
+ * Warna TIDAK berubah — palet bawaan sudah AAA, dan menaikkan kontras
+ * dari 14,73:1 tidak memberi manfaat terukur (FEATURE-SPECS S1). */
+[data-a11y-visual="true"] {
+  --text-body: var(--text-body-lg);
+  --touch-min: var(--touch-comfortable);
+}
+
+/* Profil Motorik: target lebih besar dan berjarak lebih jauh. */
+[data-a11y-motor="true"] {
+  --touch-min: var(--touch-motor);
+  --touch-gap: var(--touch-gap-motor);
+}
+
+/* Fokus tidak pernah dihilangkan tanpa pengganti yang lebih terlihat. */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Setiap elemen interaktif memenuhi target minimum. */
+button,
+[role="button"],
+a[href],
+input,
+select,
+textarea {
+  min-block-size: var(--touch-min);
+}
+
+/* Gerak dimatikan sepenuhnya saat pengguna memintanya.
+ * TC-A11Y-08 memverifikasi ini. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

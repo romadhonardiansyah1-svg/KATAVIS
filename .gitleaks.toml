@@ -1,0 +1,70 @@
+# Konfigurasi gitleaks — pemindaian rahasia yang ter-commit.
+#
+# Dipakai CI (`.github/workflows/ci.yml`) dan dapat dijalankan lokal:
+#
+#   docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+#     detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose
+#
+# Mengapa diperiksa: rahasia yang sudah masuk riwayat tidak dapat ditarik
+# kembali dengan menghapusnya di commit berikutnya. Memindahkannya berarti
+# menulis ulang riwayat, dan itu pekerjaan yang jauh lebih mahal daripada
+# mencegahnya di sini.
+
+title = "KATAVIS"
+
+[extend]
+# Aturan bawaan gitleaks dipakai apa adanya; yang ditambahkan di bawah hanya
+# kekhususan proyek ini.
+useDefault = true
+
+# --- Kekhususan proyek ---
+
+[[rules]]
+# Kunci penandatanganan JWT disimpan sebagai base64 32 byte. Panjang itu
+# tidak tertangkap entropi umum gitleaks karena tanpa awalan yang khas.
+id = "katavis-jwt-signing-key"
+description = "Kunci penandatanganan JWT KATAVIS"
+regex = '''(?i)(JWT_SIGNING_KEY|jwtSigningKey)\s*[:=]\s*["']?([A-Za-z0-9+/]{40,}={0,2})'''
+secretGroup = 2
+keywords = ["JWT_SIGNING_KEY", "jwtSigningKey"]
+
+[[rules]]
+# Rahasia bersama Worker ↔ Studio Agent, dipakai untuk menandatangani
+# permintaan antrian. 64 heksadesimal.
+id = "katavis-agent-shared-key"
+description = "Rahasia bersama Worker dan Studio Agent"
+regex = '''(?i)(AGENT_SHARED_KEY|agentSharedKey)\s*[:=]\s*["']?([A-Fa-f0-9]{48,})'''
+secretGroup = 2
+keywords = ["AGENT_SHARED_KEY", "agentSharedKey"]
+
+# --- Pengecualian ---
+#
+# Setiap entri di bawah harus punya alasan. Pengecualian yang tidak
+# dijelaskan akan dihapus orang berikutnya tanpa mengetahui mengapa ia ada.
+
+[allowlist]
+description = "Berkas contoh, berkas uji, dan berkas yang tidak pernah di-commit"
+
+paths = [
+  # Contoh yang memang berisi nama variabel tanpa nilai nyata. Justru
+  # gunanya memberi tahu kontributor variabel apa saja yang dibutuhkan.
+  '''\.env\.example$''',
+
+  # Berkas ini memuat nilai pengembangan lokal yang sudah diabaikan git
+  # (`.gitignore` baris 13–14). Dipindai hanya bila seseorang menjalankan
+  # gitleaks atas pohon kerja yang belum bersih.
+  '''^\.dev\.vars''',
+
+  # Berkas uji memuat kunci palsu dengan sengaja. Kalau diizinkan, kunci
+  # nyata yang tidak sengaja tertinggal di dalamnya ikut lolos — karena itu
+  # berkas uji TIDAK dikecualikan seluruhnya, hanya nilai yang sudah jelas
+  # palsu di bawah ini.
+]
+
+regexes = [
+  # Penanda yang tidak mungkin merupakan rahasia nyata: dipakai di uji,
+  # tipe, dan dokumentasi untuk menunjukkan bentuknya saja.
+  '''(?i)(test|dummy|fake|example|contoh|placeholder|redacted|DIHAPUS)''',
+  # Kunci yang sengaja dibuat pendek/diulang agar mudah dikenali di uji.
+  '''(?i)["']?(a{8,}|0{8,}|x{8,}|1{8,})["']?''',
+]

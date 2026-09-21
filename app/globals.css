@@ -1,0 +1,65 @@
+/**
+ * Gaya dasar aplikasi.
+ *
+ * Seluruh nilai warna, ukuran, dan spasi berasal dari `tokens.css`. Tidak
+ * ada warna mentah di berkas ini maupun di komponen mana pun — menambah
+ * warna baru menuntut menjalankan `python tools/contrast.py`, dan skrip itu
+ * akan gagal bila angkanya tidak cocok dengan DESIGN.md.
+ */
+
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Teks dasar 18px (--text-body). Peramban menghitung rem dari sini. */
+  font-size: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--leading-relaxed);
+  /* Teks dapat diperbesar sampai 200% tanpa kehilangan isi. */
+  text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-semibold);
+}
+
+p {
+  margin: 0;
+}
+
+/* Tombol dan tautan tidak pernah kehilangan fokus yang terlihat. */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Tautan yang tampil sebagai aksi sekunder tetap memenuhi target sentuh. */
+a {
+  color: var(--action);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

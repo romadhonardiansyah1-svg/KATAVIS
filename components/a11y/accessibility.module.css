@@ -1,0 +1,270 @@
+/**
+ * Gaya tombol Accessibility Mode.
+ *
+ * Seluruh nilai dari `tokens.css`; tidak ada warna mentah. Target sentuh
+ * memakai `--touch-min`, sehingga profil Motorik dan Visual memperbesarnya
+ * tanpa berkas ini perlu tahu profil mana yang menyala.
+ *
+ * Catatan tentang enam status interaktif: tombol pembuka dan tombol
+ * pengembalian punya keenamnya, termasuk `loading` — keduanya memicu
+ * penyimpanan ke server, dan "Menyimpan..." adalah keadaan yang nyata.
+ * Kotak centang profil tidak punya `loading`, karena mencentang kotak tidak
+ * menunggu apa pun; yang menunggu adalah penyimpanannya, dan itu keadaan
+ * tombol, bukan kotaknya. Status `disabled` tetap didefinisikan untuk
+ * keduanya supaya tidak ada elemen interaktif yang kehilangan tampilannya
+ * saat dinonaktifkan.
+ */
+
+.dock {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-inline-size: min(22rem, calc(100vw - var(--space-8)));
+}
+
+/* --- Tombol pembuka: enam status --- */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width-strong) solid var(--action);
+  border-radius: var(--radius-pill);
+  background: var(--action);
+  color: var(--text-inverse);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  box-shadow: var(--shadow-raised);
+  transition:
+    background var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+.toggle:hover:not(:disabled) {
+  background: var(--action-hover);
+  border-color: var(--action-hover);
+}
+
+.toggle:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.toggle:active:not(:disabled) {
+  background: var(--action);
+  transform: translateY(1px);
+}
+
+.toggle:disabled {
+  background: var(--clay-200);
+  border-color: var(--border-strong);
+  color: var(--clay-700);
+  cursor: not-allowed;
+}
+
+.toggle[aria-busy="true"] {
+  /* Keadaan menyimpan. Tombolnya tetap dapat ditekan — pengrajin boleh
+     menyalakan profil kedua sementara yang pertama masih tersimpan — dan
+     yang berubah hanya penandanya, bukan labelnya. */
+  border-style: dashed;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--space-6);
+  min-block-size: var(--space-6);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--text-inverse);
+  color: var(--action);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+}
+
+/* --- Panel --- */
+
+.panel {
+  flex-direction: column;
+  gap: var(--space-3);
+  inline-size: 100%;
+  max-block-size: 70dvh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-surface);
+  background: var(--bg-page);
+  box-shadow: var(--shadow-raised);
+}
+
+/* `hidden` harus tetap menang atas `display: flex`. */
+.panel:not([hidden]) {
+  display: flex;
+}
+
+.panelTitle {
+  font-size: var(--text-subhead);
+}
+
+.panelHint {
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --- Satu profil: default, hover, focus-visible, active, disabled --- */
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-block-size: var(--touch-min);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--bg-page);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.option:hover {
+  background: var(--bg-surface);
+}
+
+/* Fokus kotak centangnya terlihat pada seluruh barisnya, sehingga cincin
+   fokusnya tidak tersembunyi di balik kotak 24px. */
+.option:focus-within {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.option:active {
+  background: var(--bg-surface);
+}
+
+.optionDisabled,
+.option:has(.checkbox:disabled) {
+  background: var(--bg-surface);
+  color: var(--clay-700);
+  cursor: not-allowed;
+}
+
+.checkbox {
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  margin: 0;
+  accent-color: var(--action);
+  flex: none;
+}
+
+.checkbox:disabled {
+  cursor: not-allowed;
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.optionLabel {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-label);
+}
+
+.optionHint {
+  font-size: var(--text-small);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* --- Status: ikon + teks + warna --- */
+
+.status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  line-height: var(--leading-normal);
+}
+
+.statusBusy {
+  color: var(--text-secondary);
+}
+
+.statusSaved {
+  color: var(--success);
+}
+
+.statusError {
+  color: var(--danger);
+}
+
+/* --- Tombol pengembalian: enam status --- */
+
+.resetButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-surface);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-body);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.resetButton:hover:not(:disabled) {
+  background: var(--bg-surface);
+}
+
+.resetButton:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.resetButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.resetButton:disabled {
+  background: var(--clay-200);
+  color: var(--clay-700);
+  cursor: not-allowed;
+}
+
+.resetButton[aria-busy="true"] {
+  border-style: dashed;
+}
+
+/* --- Pembacaan teks --- */
+
+.speak {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
