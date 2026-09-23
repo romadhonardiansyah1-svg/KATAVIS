@@ -504,9 +504,9 @@ async function processAsrJob(
 
   const locale = (context.locale ?? "id") as Locale;
 
-  // Penyedia menerima URL, bukan bita: keduanya mengambil sendiri berkasnya
-  // lewat `fetch`, sehingga tidak ada bita audio yang perlu disalin ke dalam
-  // permintaan JSON.
+  const audioBytes = new Uint8Array(await object.arrayBuffer());
+
+  // Penyedia menerima audioBytes langsung dari R2 tanpa perlu fetch balik ke Worker lewat HTTP.
   const audioUrl = `${dependencies.audioBaseUrl ?? "https://katavis.invalid"}/api/v1/media/${context.audioKey}`;
 
   const providers = [
@@ -516,7 +516,7 @@ async function processAsrJob(
     createWorkersAiTranscriptionProvider({ ai: env.AI }),
   ];
 
-  const steps = transcriptionChainSteps(providers, { audioUrl, locale });
+  const steps = transcriptionChainSteps(providers, { audioUrl, audioBytes, locale });
 
   await d1SetProgress(env.DB, context.id, 40);
 

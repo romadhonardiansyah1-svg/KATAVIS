@@ -27,6 +27,7 @@ import {
   type ImageResult,
   type ProviderId,
   type Transcript,
+  type TranscriptionRequest,
 } from "./providers";
 
 // --- Batas waktu ---
@@ -274,20 +275,21 @@ export function createGroqTranscriptionProvider(options: GroqOptions) {
     id: "groq" as const,
     timeoutMs: ASR_TIMEOUT_MS,
 
-    async transcribe(request: {
-      readonly audioUrl: string;
-      readonly locale: string;
-      readonly signal: AbortSignal;
-    }): Promise<Transcript> {
+    async transcribe(request: TranscriptionRequest): Promise<Transcript> {
       const startedAt = Date.now();
 
       return guard("groq", request.signal, async () => {
-        const source = await fetch(request.audioUrl, { signal: request.signal });
-        if (!source.ok) {
-          throw new ProviderError(502, `groq: audio tidak dapat diambil (${source.status}).`);
+        let audio: Blob;
+        if (request.audioBytes && request.audioBytes.byteLength > 0) {
+          audio = new Blob([request.audioBytes as BlobPart], { type: "audio/webm" });
+        } else {
+          const source = await fetch(request.audioUrl, { signal: request.signal });
+          if (!source.ok) {
+            throw new ProviderError(502, `groq: audio tidak dapat diambil (${source.status}).`);
+          }
+          audio = await source.blob();
         }
 
-        const audio = await source.blob();
         const form = new FormData();
         // Nama berkas wajib ada; tanpa itu Groq menolaknya sebagai muatan
         // yang tidak lengkap dan pesannya tidak menyebut penyebabnya.
@@ -344,20 +346,20 @@ export function createWorkersAiTranscriptionProvider(options: WorkersAiAsrOption
     id: "workers_ai" as const,
     timeoutMs: ASR_TIMEOUT_MS,
 
-    async transcribe(request: {
-      readonly audioUrl: string;
-      readonly locale: string;
-      readonly signal: AbortSignal;
-    }): Promise<Transcript> {
+    async transcribe(request: TranscriptionRequest): Promise<Transcript> {
       const startedAt = Date.now();
 
       return guard("workers_ai", request.signal, async () => {
-        const source = await fetch(request.audioUrl, { signal: request.signal });
-        if (!source.ok) {
-          throw new ProviderError(502, `workers_ai: audio tidak dapat diambil (${source.status}).`);
+        let bytes: Uint8Array;
+        if (request.audioBytes && request.audioBytes.byteLength > 0) {
+          bytes = request.audioBytes;
+        } else {
+          const source = await fetch(request.audioUrl, { signal: request.signal });
+          if (!source.ok) {
+            throw new ProviderError(502, `workers_ai: audio tidak dapat diambil (${source.status}).`);
+          }
+          bytes = new Uint8Array(await source.arrayBuffer());
         }
-
-        const bytes = new Uint8Array(await source.arrayBuffer());
 
         const response = await options.ai.run(
           WORKERS_AI_ASR_MODEL as never,

@@ -1378,6 +1378,30 @@ route("POST", `${API_PREFIX}/products/:id/audio`, "session", async (context) => 
   if (!(audio instanceof File)) return apiError("ASR_NO_SPEECH");
   if (audio.size > LIMITS.MAX_UPLOAD_BYTES) return apiError("FILE_TOO_LARGE");
 
+  const mediaId = ulid();
+  const mimeType = audio.type || "audio/webm";
+  const bytes = audio.size;
+  const r2Key = `products/${productId}/audio-raw-${mediaId}.webm`;
+
+  await context.env.MEDIA.put(r2Key, await audio.arrayBuffer(), {
+    httpMetadata: { contentType: mimeType },
+  });
+
+  await d1InsertMediaAsset(
+    context.env.DB,
+    {
+      id: mediaId,
+      productId,
+      kind: "audio_raw",
+      r2Key,
+      mimeType,
+      bytes,
+    },
+    context.nowMs,
+  );
+
+  await d1ConfirmMediaAsset(context.env.DB, mediaId, { mimeType, bytes });
+
   const jobId = ulid();
   await d1InsertJob(context.env.DB, { id: jobId, productId, kind: "asr" }, context.nowMs);
   await enqueueJobs(context, [{ id: jobId, productId, kind: "asr" }]);

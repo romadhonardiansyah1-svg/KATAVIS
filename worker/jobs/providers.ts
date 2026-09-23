@@ -94,6 +94,7 @@ export interface ImageProvider {
 
 export interface TranscriptionRequest {
   readonly audioUrl: string;
+  readonly audioBytes?: Uint8Array | null;
   readonly locale: Locale;
   readonly signal: AbortSignal;
 }
