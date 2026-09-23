@@ -117,10 +117,17 @@ export default function LoginPage(): React.JSX.Element {
       return;
     }
 
+    const normalized = normalizePhone(phone);
+    if (normalized === null) {
+      setMessage("Nomor ponsel tidak sah. Silakan kembali dan masukkan nomor ponsel dengan benar.");
+      setAction("");
+      return;
+    }
+
     setBusy(true);
     setMessage(null);
 
-    const result = await verifyOtp(phone, digits);
+    const result = await verifyOtp(normalized, digits);
 
     setBusy(false);
 

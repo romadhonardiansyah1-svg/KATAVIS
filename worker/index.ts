@@ -537,8 +537,21 @@ async function sendOtpCode(env: Env, phone: string, code: string): Promise<void>
   );
 }
 
+function normalizeServerPhone(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null || !("phone" in raw) || typeof (raw as { phone?: unknown }).phone !== "string") {
+    return raw;
+  }
+  const digits = (raw as { phone: string }).phone.replace(/[\s\-().]/g, "");
+  let phone = (raw as { phone: string }).phone;
+  if (digits.startsWith("+62")) phone = digits;
+  else if (digits.startsWith("62")) phone = `+${digits}`;
+  else if (digits.startsWith("0")) phone = `+62${digits.slice(1)}`;
+  else if (digits.startsWith("8")) phone = `+62${digits}`;
+  return { ...raw, phone };
+}
+
 route("POST", `${API_PREFIX}/auth/otp/request`, "public", async (context) => {
-  const parsed = OtpRequestSchema.safeParse(await readJson(context.request));
+  const parsed = OtpRequestSchema.safeParse(normalizeServerPhone(await readJson(context.request)));
   if (!parsed.success) return apiError("UNAUTHENTICATED");
 
   const clientIp =
@@ -566,7 +579,7 @@ route("POST", `${API_PREFIX}/auth/otp/request`, "public", async (context) => {
 });
 
 route("POST", `${API_PREFIX}/auth/otp/verify`, "public", async (context) => {
-  const parsed = OtpVerifySchema.safeParse(await readJson(context.request));
+  const parsed = OtpVerifySchema.safeParse(normalizeServerPhone(await readJson(context.request)));
   if (!parsed.success) return apiError("UNAUTHENTICATED");
 
   let verified = await verifyOtp(
