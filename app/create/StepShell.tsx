@@ -17,6 +17,7 @@
 import Link from "next/link";
 
 import { actionLabel } from "@/lib/errors";
+import { clearAccessToken } from "@/lib/session";
 
 import styles from "./flow.module.css";
 import { TOTAL_STEPS, stepById, type StepId } from "./flow";
@@ -141,8 +142,9 @@ export function StepShell({
               {actionLabel(error.action) === "" ? null : error.action === "LOGIN" ? (
                 <Link
                   className={styles.errorAction}
-                  href="/masuk"
+                  href="/masuk?reauth=1"
                   style={{ display: "inline-block", textDecoration: "underline", fontWeight: 600 }}
+                  onClick={() => clearAccessToken()}
                 >
                   {actionLabel(error.action)} →
                 </Link>

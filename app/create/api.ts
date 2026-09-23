@@ -12,6 +12,12 @@
  */
 
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
+import {
+  readAccessToken,
+  readRefreshToken,
+  writeAccessToken,
+  writeRefreshToken,
+} from "@/lib/session";
 
 /**
  * Alamat Worker.
@@ -51,10 +57,40 @@ function failureOf(code: ErrorCode): ApiFailure {
   };
 }
 
+async function refreshSession(): Promise<boolean> {
+  const refreshToken = readRefreshToken();
+  if (refreshToken === null) return false;
+
+  try {
+    const res = await fetch(`${getApiBaseUrl()}${API_PREFIX}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return false;
+    const envelope: unknown = await res.json();
+    if (
+      typeof envelope === "object" &&
+      envelope !== null &&
+      (envelope as { ok?: unknown }).ok === true
+    ) {
+      const payload = (envelope as { data?: { accessToken?: string; refreshToken?: string } }).data;
+      if (typeof payload?.accessToken === "string") {
+        writeAccessToken(payload.accessToken);
+        if (typeof payload.refreshToken === "string") writeRefreshToken(payload.refreshToken);
+        return true;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 async function request<TValue>(
   path: string,
   token: string,
-  init: RequestInit = {},
+  init: RequestInit & { readonly _retried?: boolean } = {},
 ): Promise<ApiResult<TValue>> {
   let response: Response;
 
@@ -70,6 +106,15 @@ async function request<TValue>(
     // Tidak ada koneksi. Ini keadaan yang sudah diperhitungkan, bukan galat
     // yang tidak terduga: pekerjaan pengrajin tersimpan di perangkat.
     return { ok: false, error: failureOf("NETWORK_OFFLINE") };
+  }
+
+  // Jika token kedaluwarsa, coba perbarui otomatis dengan refresh token
+  if (response.status === 401 && !init._retried && !path.startsWith("/auth/")) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      const activeToken = readAccessToken() ?? token;
+      return request<TValue>(path, activeToken, { ...init, _retried: true });
+    }
   }
 
   let body: unknown;

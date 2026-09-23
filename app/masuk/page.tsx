@@ -28,7 +28,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { actionLabel } from "@/lib/errors";
-import { readAccessToken, writeAccessToken, writeRefreshToken } from "@/lib/session";
+import {
+  clearAccessToken,
+  readAccessToken,
+  writeAccessToken,
+  writeRefreshToken,
+} from "@/lib/session";
 
 import styles from "../create/flow.module.css";
 import { requestOtp, verifyOtp } from "../create/api";
@@ -55,6 +60,10 @@ export default function LoginPage(): React.JSX.Element {
   // di klien, bukan di server: tokennya hidup di `localStorage`, dan server
   // tidak dapat membacanya.
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("reauth")) {
+      clearAccessToken();
+      return;
+    }
     if (readAccessToken() !== null) router.replace("/create");
   }, [router]);
 

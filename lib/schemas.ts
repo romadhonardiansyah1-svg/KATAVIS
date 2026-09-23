@@ -88,7 +88,7 @@ export const LIMITS = {
   INVITE_TTL_MS: 24 * 60 * 60 * 1000,
   /** URL bertanda tangan. Diuji di TC-I-06. */
   UPLOAD_URL_TTL_MS: 15 * 60 * 1000,
-  /** PRD bagian 6. */
+  /** PRD bagian 6 dan kontrak API bagian 2 (900 detik / 15 menit). */
   ACCESS_TOKEN_TTL_S: 15 * 60,
   REFRESH_TOKEN_TTL_MS: 30 * 24 * 60 * 60 * 1000,
   /** TC-SEC-13. */
