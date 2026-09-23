@@ -19,7 +19,12 @@ import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
  * Diisi lewat `NEXT_PUBLIC_API_BASE_URL`. Bawaannya alamat `wrangler dev`
  * supaya pengembangan lokal berjalan tanpa konfigurasi.
  */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
+function getApiBaseUrl(): string {
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:8787`;
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
+}
 const API_PREFIX = "/api/v1";
 
 export interface ApiFailure {
@@ -54,7 +59,7 @@ async function request<TValue>(
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+    response = await fetch(`${getApiBaseUrl()}${API_PREFIX}${path}`, {
       ...init,
       headers: {
         ...(init.headers ?? {}),
@@ -116,6 +121,52 @@ function jsonRequest<TValue>(
   });
 }
 
+// --- Auth (§2) ---
+
+/**
+ * Penyedia OTP.
+ *
+ * `POST /auth/otp/request` tidak memerlukan token — ia justru satu-satunya
+ * jalan mendapatkannya. Karena itu ia memakai `request` dengan token kosong,
+ * dan Worker mengabaikan header `Authorization` pada rute publik.
+ */
+export interface OtpChallenge {
+  readonly expiresAt: number;
+  readonly resendAfter: number;
+}
+
+export function requestOtp(phone: string): Promise<ApiResult<OtpChallenge>> {
+  return request<OtpChallenge>("/auth/otp/request", "", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export interface SignedInUser {
+  readonly id: string;
+  readonly displayName: string | null;
+  readonly role: string;
+  readonly locale: string;
+  readonly a11yProfile: unknown;
+  readonly isNewUser: boolean;
+}
+
+export interface Session {
+  readonly accessToken: string;
+  readonly refreshToken: string;
+  readonly expiresIn: number;
+  readonly user: SignedInUser;
+}
+
+export function verifyOtp(phone: string, code: string): Promise<ApiResult<Session>> {
+  return request<Session>("/auth/otp/verify", "", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code }),
+  });
+}
+
 // --- Produk (§4) ---
 
 export interface CreatedProduct {
@@ -155,7 +206,15 @@ export interface ProductDetail {
   readonly media: readonly {
     readonly id: string;
     readonly kind: string;
-    readonly url: string;
+    /**
+     * URL baca bertanda tangan, atau `null` bila kuncinya tidak aman.
+     *
+     * Server mengirim `null` alih-alih mengarang URL. Konsumen yang
+     * menerimanya menampilkan keterangan "belum ada foto", bukan gambar
+     * rusak — lebih baik mengaku tidak ada daripada menampilkan kotak
+     * bergaris silang di depan juri.
+     */
+    readonly url: string | null;
     readonly altText: string | null;
     readonly isPrimary: boolean;
   }[];
@@ -314,5 +373,5 @@ export function getJobs(
 // --- Ekspor dan katalog publik (§10) ---
 
 export function publicCatalogUrl(slug: string): string {
-  return `${API_BASE_URL}${API_PREFIX}/public/catalog/${slug}`;
+  return `${getApiBaseUrl()}${API_PREFIX}/public/catalog/${slug}`;
 }

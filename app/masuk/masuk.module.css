@@ -1,0 +1,50 @@
+/*
+ * Gaya khusus layar masuk.
+ *
+ * Hanya dua hal yang tidak dapat diambil dari `flow.module.css`: kotak
+ * masukan teks, dan kotak kode berukuran besar. Sisanya — kerangka halaman,
+ * aksi utama, aksi sekunder, banner galat, indikator status — memakai kelas
+ * yang sama dengan alur enam langkah, dan itu disengaja: RHYTHM bernilai 1,
+ * keseragaman antarlayar adalah fitur aksesibilitas, bukan kemalasan
+ * (DESIGN.md §2).
+ */
+
+.input {
+  inline-size: 100%;
+  min-block-size: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+
+  /*
+   * `border-strong`, bukan `border`. Kotak masukan adalah satu-satunya
+   * kendali yang harus terlihat batasnya tanpa bergantung pada warna latar:
+   * pengguna low vision yang tidak melihat perbedaan dua nuansa krem masih
+   * harus menemukan tempat mengetik.
+   */
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-body);
+  line-height: var(--leading-relaxed);
+}
+
+.input:disabled {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+/*
+ * Kotak kode.
+ *
+ * Angka enam digit dibaca satu per satu, jadi ukurannya dinaikkan dan
+ * jaraknya dilebarkan. Bukan hiasan: pada 18 px, "1" dan "7" pada layar
+ * ponsel yang tergores sulit dibedakan, dan kesalahan membaca kode berakhir
+ * sebagai "kode salah" yang menyalahkan pengrajin.
+ */
+.codeInput {
+  font-size: var(--text-heading);
+  letter-spacing: 0.35em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

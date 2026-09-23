@@ -39,8 +39,8 @@ function fakeD1(rows: readonly unknown[]): { readonly db: D1Database; readonly r
 }
 
 const JOB_ROW = {
-  id: "01J8ZQFX9K7YWVTN3MABCDJ01",
-  product_id: "01J8ZQFX9K7YWVTN3MABCDP01",
+  id: "01J8ZQFX9K7YWVTN3MABCDJ012",
+  product_id: "01J8ZQFX9K7YWVTN3MABCDP012",
   kind: "image",
   status: "running",
   provider: "gemini_web",
@@ -55,8 +55,8 @@ const JOB_ROW = {
 
 function job(overrides: Partial<JobRecord> = {}): JobRecord {
   return {
-    id: "01J8ZQFX9K7YWVTN3MABCDJ01",
-    productId: "01J8ZQFX9K7YWVTN3MABCDP01",
+    id: "01J8ZQFX9K7YWVTN3MABCDJ012",
+    productId: "01J8ZQFX9K7YWVTN3MABCDP012",
     kind: "image",
     status: "running",
     provider: "gemini_web",
@@ -77,7 +77,7 @@ describe("jobs/d1-jobs — d1ListJobs", () => {
     // yang dibaca bilah kemajuan di layar proses.
     const { db } = fakeD1([JOB_ROW]);
 
-    const jobs = await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP01");
+    const jobs = await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP012");
 
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toEqual({
@@ -101,7 +101,7 @@ describe("jobs/d1-jobs — d1ListJobs", () => {
     // begitu satu produk punya banyak tahap.
     const { db, recorded } = fakeD1([JOB_ROW, JOB_ROW, JOB_ROW]);
 
-    await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP01");
+    await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP012");
 
     expect(recorded).toHaveLength(1);
     expect(recorded[0]?.sql).toContain("WHERE product_id = ?");
@@ -111,14 +111,14 @@ describe("jobs/d1-jobs — d1ListJobs", () => {
   it("mengembalikan larik kosong saat produk belum punya pekerjaan", async () => {
     const { db } = fakeD1([]);
 
-    expect(await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP01")).toEqual([]);
+    expect(await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP012")).toEqual([]);
   });
 
   it("meneruskan locale null apa adanya", async () => {
     // Pekerjaan ASR tidak punya bahasa: rekaman pengrajin satu bahasa.
     const { db } = fakeD1([{ ...JOB_ROW, locale: null, kind: "asr" }]);
 
-    const jobs = await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP01");
+    const jobs = await d1ListJobs(db, "01J8ZQFX9K7YWVTN3MABCDP012");
 
     expect(jobs[0]?.locale).toBeNull();
     expect(jobs[0]?.kind).toBe("asr");

@@ -14,7 +14,13 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { clearAccessToken, readAccessToken, writeAccessToken } from "./session";
+import {
+  clearAccessToken,
+  readAccessToken,
+  readRefreshToken,
+  writeAccessToken,
+  writeRefreshToken,
+} from "./session";
 
 interface FakeStorage {
   readonly entries: Map<string, string>;
@@ -93,12 +99,48 @@ describe("lib/session", () => {
     expect(storage.entries.get("katavis.accessToken")).toBe("token-uji");
   });
 
+  it("menyimpan token penyegar di kunci yang terpisah", () => {
+    // Dua token, dua kunci. Menyimpannya di satu kunci akan membuat pembacaan
+    // token akses mengembalikan gabungan keduanya.
+    const storage = installWindow();
+    writeAccessToken("akses");
+    writeRefreshToken("segarkan");
+
+    expect(readAccessToken()).toBe("akses");
+    expect(readRefreshToken()).toBe("segarkan");
+    expect(Array.from(storage.entries.keys()).sort()).toEqual([
+      "katavis.accessToken",
+      "katavis.refreshToken",
+    ]);
+  });
+
+  it("memperlakukan token penyegar kosong sebagai belum masuk", () => {
+    const storage = installWindow();
+    storage.setItem("katavis.refreshToken", "");
+
+    expect(readRefreshToken()).toBeNull();
+  });
+
   it("menghapus token saat pengguna keluar", () => {
     const storage = installWindow();
     writeAccessToken("token-uji");
     clearAccessToken();
 
     expect(readAccessToken()).toBeNull();
+    expect(storage.entries.size).toBe(0);
+  });
+
+  it("menghapus kedua token sekaligus saat keluar", () => {
+    // Menyisakan token penyegar setelah keluar berarti perangkat itu masih
+    // dapat memperoleh akses baru. Pada perangkat yang dipakai bergantian di
+    // SLB, itu bukan detail.
+    const storage = installWindow();
+    writeAccessToken("akses");
+    writeRefreshToken("segarkan");
+    clearAccessToken();
+
+    expect(readAccessToken()).toBeNull();
+    expect(readRefreshToken()).toBeNull();
     expect(storage.entries.size).toBe(0);
   });
 

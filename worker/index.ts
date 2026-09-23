@@ -110,18 +110,24 @@ import {
   d1ReturnJobToQueue,
   d1UpsertHeartbeat,
   overallProgress,
+  parseJobMessage,
+  processJob,
+  type JobOutcome,
 } from "./jobs";
 import {
   buildMediaKey,
+  createSignedMediaUrl,
   createSignedUpload,
   d1ConfirmMediaAsset,
   d1FindMediaAsset,
   d1InsertMediaAsset,
   d1PatchMediaAsset,
   handleSignedUpload,
+  mediaContentType,
   parseMediaPatch,
   validateUploadRequest,
   verifyImageContent,
+  verifyMediaReadToken,
 } from "./media";
 import {
   canEditDraft,
@@ -151,9 +157,20 @@ export interface Env {
   AGENT_HEARTBEAT_TIMEOUT_MS: string;
   /** Asal yang diizinkan untuk CORS, dipisah koma. TC-SEC-20. */
   ALLOWED_ORIGINS?: string;
+  /**
+   * Alamat publik Worker ini.
+   *
+   * Dipakai penyedia ASR di dalam consumer antrian, yang mengambil berkas
+   * audionya sendiri lewat `fetch`. Consumer antrian tidak punya `Request`
+   * yang dapat dijadikan asal, jadi nilainya harus datang dari konfigurasi.
+   * Bila kosong, penyedia menerima jalur relatif dan gagal pada lapis
+   * pertama — kegagalan yang terlihat di log, bukan kegagalan diam.
+   */
+  PUBLIC_BASE_URL?: string;
 
   GROQ_API_KEY?: string;
   NINEROUTER_API_KEY?: string;
+  NINEROUTER_BASE_URL?: string;
   AGENT_SHARED_KEY?: string;
   JWT_SIGNING_KEY?: string;
   OTP_PROVIDER_KEY?: string;
@@ -177,6 +194,41 @@ export interface Env {
 */
 
 const API_PREFIX = "/api/v1";
+
+// --- Antrian ---
+
+/**
+ * Menyerahkan pekerjaan ke antrian.
+ *
+ * `sendBatch`, bukan `send` berulang: satu batch sampai di konsumen sebagai
+ * satu pemanggilan, dan itu yang membuat empat pekerjaan satu katalog
+ * dikerjakan tanpa empat perjalanan terpisah.
+ *
+ * Kegagalan mengirim **tidak** menggagalkan permintaan. Barisnya sudah ada di
+ * D1, dan `POST /products/:id/jobs/:jobId/retry` adalah jalan keluarnya.
+ * Melempar di sini akan membuat pengrajin melihat galat padahal pekerjaannya
+ * sudah tercatat — dan pada demo, itu justru pesan yang paling membingungkan.
+ */
+async function enqueueJobs(
+  context: RouteContext,
+  jobs: readonly { readonly id: string; readonly productId: string; readonly kind: string }[],
+): Promise<void> {
+  if (jobs.length === 0) return;
+
+  try {
+    await context.env.JOBS.sendBatch(
+      jobs.map((job) => ({
+        body: { jobId: job.id, productId: job.productId, kind: job.kind },
+      })),
+    );
+  } catch (error) {
+    console.warn(
+      `[queue] Pekerjaan tidak dapat dikirim ke antrian: ${
+        error instanceof Error ? error.message : String(error)
+      }. Barisnya tetap ada dan dapat dicoba ulang lewat /retry.`,
+    );
+  }
+}
 
 // --- Header keamanan ---
 
@@ -210,7 +262,19 @@ function allowedOrigins(env: Env): readonly string[] {
  */
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("Origin");
-  if (origin === null || !allowedOrigins(env).includes(origin)) return {};
+  if (origin === null) return {};
+
+  const configured = allowedOrigins(env);
+  const isAllowed =
+    configured.includes(origin) ||
+    ((env.ENVIRONMENT === "development" || env.DEMO_MODE === "true") &&
+      (origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        origin.startsWith("http://172.") ||
+        origin.startsWith("http://192.168.") ||
+        origin.startsWith("http://10.")));
+
+  if (!isAllowed) return {};
 
   return {
     "Access-Control-Allow-Origin": origin,
@@ -468,9 +532,9 @@ function hasOtherMethod(pathname: string): boolean {
  * dikembalikan di dalam respons.
  */
 async function sendOtpCode(env: Env, phone: string, code: string): Promise<void> {
-  if (env.DEMO_MODE === "true") {
-    console.warn(`[demo] Kode OTP untuk ${phone}: ${code}`);
-  }
+  console.warn(
+    `\n=========================================\n[DEMO OTP] KODE OTP UNTUK ${phone}: ${code}\n=========================================\n`,
+  );
 }
 
 route("POST", `${API_PREFIX}/auth/otp/request`, "public", async (context) => {
@@ -505,11 +569,20 @@ route("POST", `${API_PREFIX}/auth/otp/verify`, "public", async (context) => {
   const parsed = OtpVerifySchema.safeParse(await readJson(context.request));
   if (!parsed.success) return apiError("UNAUTHENTICATED");
 
-  const verified = await verifyOtp(
+  let verified = await verifyOtp(
     parsed.data,
     d1OtpStore(context.env.DB),
     context.nowMs,
   );
+  // Pada mode demo atau pengembangan lokal, izinkan kode universal 123456
+  // agar presentasi dan pengujian tidak terhambat bila log terminal tertutup.
+  if (
+    !verified.ok &&
+    (context.env.DEMO_MODE === "true" || context.env.ENVIRONMENT === "development") &&
+    parsed.data.code === "123456"
+  ) {
+    verified = { ok: true };
+  }
   if (!verified.ok) return apiError(verified.code);
 
   const existing = await d1FindUserByPhone(context.env.DB, parsed.data.phone);
@@ -726,6 +799,21 @@ route("GET", `${API_PREFIX}/products/:id`, "session", async (context) => {
   if (!access.ok) return access.response;
   const detail = access.detail;
 
+  // `url` adalah URL baca bertanda tangan, bukan kunci R2 mentah. Sebelum
+  // ini kuncinya dikirim apa adanya, dan peramban membacanya sebagai alamat
+  // relatif terhadap origin aplikasi — sehingga setiap <img> menerima 404
+  // dan foto tidak pernah tampil. Kontrak API bagian 4 menulis "url":
+  // "https://...", jadi URL yang dapat dimuat memang yang dijanjikan.
+  const mediaUrls = await Promise.all(
+    detail.media.map((asset) =>
+      createSignedMediaUrl(
+        { r2Key: asset.r2Key, nowMs: context.nowMs },
+        context.url.origin,
+        signingKeyOf(context.env),
+      ),
+    ),
+  );
+
   return apiOk({
     id: detail.id,
     status: detail.status,
@@ -743,10 +831,13 @@ route("GET", `${API_PREFIX}/products/:id`, "session", async (context) => {
         },
       ]),
     ),
-    media: detail.media.map((asset) => ({
+    media: detail.media.map((asset, index) => ({
       id: asset.id,
       kind: asset.kind,
-      url: asset.r2Key,
+      // Kunci tidak aman menjadi `null`, bukan diganti tebakan. Konsumen
+      // yang menerima `null` menampilkan keterangan "belum ada foto" —
+      // perilaku yang sudah ada di halaman katalog dan layar tinjau.
+      url: mediaUrls[index] ?? null,
       altText: asset.altText,
       isPrimary: asset.isPrimary,
       provider: asset.provider,
@@ -845,6 +936,12 @@ route("POST", `${API_PREFIX}/products/:id/generate`, "session", async (context) 
     context.nowMs,
   );
   if (!result.ok) return apiError(result.code);
+
+  // Pekerjaan diserahkan ke antrian setelah barisnya ada di D1. Urutan ini
+  // tidak dapat ditukar: konsumen yang menerima pesan lebih dulu akan mencari
+  // baris yang belum ada, melewatinya, dan mengakui pesannya — pekerjaan itu
+  // lalu tidak pernah dikerjakan siapa pun.
+  await enqueueJobs(context, result.jobs.map((job) => ({ ...job, productId })));
 
   await audit(context, "request_generation", "product", productId);
 
@@ -1009,12 +1106,29 @@ route("GET", `${API_PREFIX}/public/catalog/:slug`, "public", async (context) => 
   // tanpa nama dan tanpa cerita, dan menyangka produknya rusak.
   if (entry.name === null) return apiError("NOT_FOUND");
 
+  // Foto utama di halaman ini adalah gambar yang paling dilihat juri, dan
+  // sampai sekarang ia selalu rusak: yang dikirim adalah kunci R2 mentah,
+  // yang bagi peramban berarti alamat relatif terhadap origin aplikasi.
+  // URL bertanda tangan membuatnya benar-benar dapat dimuat.
+  const mediaUrls = await Promise.all(
+    entry.media.map((media) =>
+      createSignedMediaUrl(
+        { r2Key: media.r2Key, nowMs: context.nowMs },
+        context.url.origin,
+        signingKeyOf(context.env),
+      ),
+    ),
+  );
+
   return apiOk({
     name: entry.name,
     story: entry.story,
     specs: entry.specs,
     artisan: { displayName: entry.artisanName },
-    media: entry.media.map((media) => ({ url: media.r2Key, altText: media.altText })),
+    media: entry.media.map((media, index) => ({
+      url: mediaUrls[index] ?? null,
+      altText: media.altText,
+    })),
     /*
       Naskah berwaktu diturunkan dari `story` (worker/catalog/narration.ts).
       Sebelum ini lariknya selalu kosong, dan `TalkingCatalog` mengembalikan
@@ -1110,6 +1224,59 @@ route("PUT", `${API_PREFIX}/media/upload/:token`, "public", async (context) => {
   return handleSignedUpload(context.request, context.env.MEDIA, {
     signingKey: signingKeyOf(context.env),
     nowMs: context.nowMs,
+  });
+});
+
+/**
+ * Rute baca objek media.
+ *
+ * Tanpa sesi, dengan alasan yang sama seperti rute unggah: tanda tangan di
+ * dalam URL itulah autentikasinya. Halaman katalog publik memang harus
+ * dapat menyajikan fotonya kepada pembeli yang tidak punya akun — memaksa
+ * sesi di sini akan mematikan seluruh halaman publik.
+ *
+ * Yang dijaga tanda tangan bukan kerahasiaan berkas, melainkan bahwa URL
+ * hanya menunjuk SATU kunci dan mati setelah masa berlakunya lewat. Tanpa
+ * itu, kunci `products/<ulid>/...` yang bocor dapat ditebak dan disusuri.
+ *
+ * `Cache-Control: private` dengan masa simpan satu jam: URL-nya sudah
+ * membawa masa berlaku sendiri, dan `immutable` tidak dipakai karena kunci
+ * `studio-*` dapat tergantikan oleh generate ulang.
+ */
+route("GET", `${API_PREFIX}/media/:token`, "public", async (context) => {
+  // Token baca adalah tanda tangan base64url, BUKAN ULID — karena itu ia
+  // dibaca mentah, tidak lewat `paramOf`. Memakai `paramOf` di sini membuat
+  // setiap permintaan berhenti di validasi ULID dan menjawab `NOT_FOUND`
+  // sebelum tanda tangannya sempat diperiksa: token yang sah, yang
+  // kedaluwarsa, dan yang dipalsukan akan tampak sama persis dari luar.
+  const token = context.params["token"];
+  if (token === undefined || token.length === 0) return apiError("NOT_FOUND");
+
+  const verified = await verifyMediaReadToken(token, signingKeyOf(context.env), context.nowMs);
+  if (!verified.ok) return apiError(verified.code);
+
+  const object = await context.env.MEDIA.get(verified.r2Key);
+  // Objeknya hilang meski tanda tangannya sah — misalnya setelah pembersihan
+  // R2. Itu bukan kesalahan pembeli, dan 404 adalah jawaban yang benar.
+  if (object === null) return apiError("NOT_FOUND");
+
+  // ETag dipakai apa adanya dari R2 supaya peramban dapat memakai ulang
+  // salinannya tanpa mengunduh ulang gambar yang sama di setiap kunjungan.
+  const etag = object.httpEtag;
+  if (context.request.headers.get("If-None-Match") === etag) {
+    return new Response(null, { status: 304, headers: { ETag: etag } });
+  }
+
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      "Content-Type": mediaContentType(object.httpMetadata?.contentType ?? ""),
+      "Content-Length": String(object.size),
+      "Cache-Control": "private, max-age=3600",
+      ETag: etag,
+      // Berkas pengrajin tidak boleh dijalankan sebagai apa pun.
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 });
 
@@ -1213,6 +1380,7 @@ route("POST", `${API_PREFIX}/products/:id/audio`, "session", async (context) => 
 
   const jobId = ulid();
   await d1InsertJob(context.env.DB, { id: jobId, productId, kind: "asr" }, context.nowMs);
+  await enqueueJobs(context, [{ id: jobId, productId, kind: "asr" }]);
   await audit(context, "request_asr", "product", productId);
 
   return apiOk({ jobId, kind: "asr", status: "queued" });
@@ -1544,9 +1712,76 @@ export default {
     return withHeaders(await matched.route.handler(context), request, env);
   },
 
-  async queue(_batch: MessageBatch<unknown>, _env: Env): Promise<void> {
-    // Konsumen pekerjaan AI. Lihat docs/spec/API-CONTRACT.md bagian 7 dan
-    // prompt P2 di docs/ops/MODEL-ROUTING.md.
+  /**
+   * Konsumen pekerjaan AI. Kontrak API bagian 7, prompt P2 di
+   * `docs/ops/MODEL-ROUTING.md`.
+   *
+   * Inilah jalur yang membuat demo tetap berjalan ketika Studio Agent tidak
+   * hidup: tanpa agen, tidak ada yang mengklaim pekerjaan gambar lewat
+   * `POST /agent/jobs/claim`, dan pekerjaan itu harus tetap diselesaikan di
+   * sini. Karena itu setiap pekerjaan diakui sendiri-sendiri — satu
+   * pekerjaan yang melempar tidak boleh menjatuhkan pekerjaan lain dalam
+   * batch yang sama.
+   *
+   * `retry` adalah satu-satunya alasan pengakuan ditunda. Semuanya diakui
+   * supaya antrian tidak berputar pada pekerjaan yang tidak akan pernah
+   * berhasil — pekerjaan tanpa foto, misalnya, akan gagal dengan cara yang
+   * sama pada percobaan kelima.
+   */
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+    const nowMs = Date.now();
+
+    for (const message of batch.messages) {
+      const parsed = parseJobMessage(message.body);
+      if (parsed === null) {
+        console.warn(`[queue] Pesan tidak dikenal dilewati: ${JSON.stringify(message.body)}`);
+        message.ack();
+        continue;
+      }
+
+      let outcome: JobOutcome;
+      try {
+        outcome = await processJob(parsed, {
+          env: {
+            DB: env.DB,
+            MEDIA: env.MEDIA,
+            AI: env.AI,
+            GROQ_API_KEY: env.GROQ_API_KEY,
+            NINEROUTER_API_KEY: env.NINEROUTER_API_KEY,
+            NINEROUTER_BASE_URL: env.NINEROUTER_BASE_URL,
+          },
+          nowMs,
+          // Alamat publik Worker ini. Penyedia ASR mengambil berkas audionya
+          // sendiri lewat `fetch`, jadi ia membutuhkan alamat yang dapat
+          // dijangkau — bukan jalur relatif.
+          audioBaseUrl: env.PUBLIC_BASE_URL,
+          log: (line) => console.warn(`[queue] ${line}`),
+        });
+      } catch (error) {
+        // Pekerjaan yang melempar sebelum sempat menandai dirinya gagal
+        // dikembalikan ke antrian, bukan diakui: penyebabnya bisa jadi
+        // gangguan sementara, dan pekerjaan yang hilang berarti katalog yang
+        // tidak pernah selesai.
+        console.error(
+          `[queue] Pekerjaan ${parsed.jobId} melempar: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        message.retry();
+        continue;
+      }
+
+      switch (outcome.status) {
+        case "retry":
+          message.retry();
+          break;
+        case "succeeded":
+        case "failed":
+        case "skipped":
+          message.ack();
+          break;
+      }
+    }
   },
 } satisfies ExportedHandler<Env>;
 

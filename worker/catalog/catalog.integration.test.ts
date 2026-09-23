@@ -38,7 +38,7 @@ const counter = createQueryCounter();
 const db = createDb(env.DB, counter);
 
 function artisanId(index: number): string {
-  return `01J8ZQFX9K7YWVTN3MABCDE${String(index).padStart(3, "0")}`;
+  return `01J8ZQFX9K7YWVTN3MABCDEFGH${String(index).padStart(3, "0")}`;
 }
 
 function actorFor(index: number): Actor {

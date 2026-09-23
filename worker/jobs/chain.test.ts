@@ -76,13 +76,20 @@ function imageResult(
   provider: ProviderId,
   durationMs = 1,
 ): ImageResult {
-  return { r2Key, provider, durationMs };
+  // Bita disertakan karena penyedia generatif memang mengembalikannya; lapis
+  // yang hanya menunjuk objek yang sudah ada memakai `bytes: null`. Keduanya
+  // sah, dan bentuknya satu supaya konsumen tidak perlu tahu lapis mana yang
+  // menang.
+  return { r2Key, bytes: new Uint8Array([1, 2, 3]), mimeType: "image/png", provider, durationMs };
 }
 
 function content(locale: Locale, provider: ProviderId): Content {
   return {
     name: `Nama ${locale}`,
     story: `Cerita ${locale}`,
+    specs: [],
+    socialCopy: null,
+    seoKeywords: [],
     provider,
     durationMs: 1_200,
   };

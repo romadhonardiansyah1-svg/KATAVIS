@@ -60,7 +60,18 @@ export interface ImageRequest {
 }
 
 export interface ImageResult {
+  /**
+   * Kunci objek hasil.
+   *
+   * Kosong bila penyedia mengembalikan bita alih-alih menunjuk objek yang
+   * sudah ada — itulah yang dilakukan penyedia generatif, dan konsumen yang
+   * membentuk kuncinya setelah mengunggah. Lapis `cache` justru sebaliknya:
+   * ia tidak punya bita sama sekali.
+   */
   readonly r2Key: string;
+  /** Bita hasil, atau null bila penyedia hanya menunjuk objek yang sudah ada. */
+  readonly bytes: Uint8Array | null;
+  readonly mimeType: string;
   readonly provider: ProviderId;
   readonly durationMs: number;
 }
@@ -111,6 +122,19 @@ export interface ContentRequest {
 export interface Content {
   readonly name: string;
   readonly story: string;
+  /**
+   * Bidang tambahan dari kontrak API bagian 4.
+   *
+   * `specs`, `socialCopy`, dan `seoKeywords` bukan hiasan: `POST
+   * /products/:id/generate` menjadwalkan pekerjaan `copy` justru untuk
+   * mengisinya, dan baris `product_content` punya kolomnya masing-masing.
+   * Ketiganya opsional-bernilai-null supaya penyedia yang hanya dapat
+   * menghasilkan nama dan cerita tetap sah — kekosongan yang jujur lebih
+   * baik daripada karangan yang mengisi kolomnya.
+   */
+  readonly specs: readonly string[];
+  readonly socialCopy: string | null;
+  readonly seoKeywords: readonly string[];
   readonly provider: ProviderId;
   readonly durationMs: number;
 }

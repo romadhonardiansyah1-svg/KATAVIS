@@ -48,10 +48,27 @@ Urutan ini dijalankan 30 menit sebelum giliran.
 2. Bila lambat atau gagal, pindah ke hotspot ponsel sekarang, bukan nanti saat di panggung.
 3. Jalankan Studio Agent. Tunggu pemeriksaan kesehatan hijau.
 4. Buka seluruh halaman demo sekali untuk memanaskan cache.
-5. Tutup semua aplikasi lain. Sisakan Chrome dan terminal.
-6. Matikan notifikasi sistem.
-7. Atur skala tampilan ke 125% agar terbaca dari kursi juri.
-8. Siapkan produk fisik di meja.
+5. **Masuk sekali dan pastikan sesinya masih hidup.** Buka `/`, lalu `/masuk`. Bila sudah diarahkan
+   ke `/create`, sesinya masih sah dan Anda tidak perlu memasukkan kode apa pun.
+6. Tutup semua aplikasi lain. Sisakan Chrome dan terminal.
+7. Matikan notifikasi sistem.
+8. Atur skala tampilan ke 125% agar terbaca dari kursi juri.
+9. Siapkan produk fisik di meja.
+
+### Kalau harus masuk di panggung
+
+Kode OTP hanya muncul di log Worker, dan itu memang satu-satunya cara — penyedia SMS belum
+terpasang. Agar tidak mencarinya di depan juri:
+
+1. Buka ponsel pada nomor demo, tekan **Kirim kode**.
+2. Kode tercetak di terminal Worker sebagai `[demo] Kode OTP untuk +62...: 123456`.
+3. Perbesar terminal itu **sebelum** naik panggung, bukan saat mencarinya.
+
+Bila `/masuk` menolak nomor, periksa bentuknya: layar itu menerima `0812...`, `+62 812-...`, dan
+`(0812) 3456.789`, tetapi menolak telepon rumah (`021...`) karena tidak dapat menerima SMS.
+
+**Masuk lebih baik dilakukan sebelum panggung.** Setiap masuk memakai satu dari tiga permintaan
+per nomor per jam, dan batas itu terasa tepat saat demo berlangsung.
 
 ## Alur demo — 7 menit (asumsi)
 
@@ -154,4 +171,9 @@ itu, pindah ke cadangan. Waktu presentasi lebih berharga daripada demo langsung 
 - [ ] Catat bagian mana yang gagal dan sebabnya
 - [ ] Simpan log `jobs` untuk analisis
 - [ ] Matikan Studio Agent
-- [ ] Nonaktifkan feature flag Gemini
+- [ ] Kembalikan `DEMO_MODE` ke `"false"`
+
+`DEMO_MODE` adalah satu-satunya sakelar yang tersisa, dan yang dilakukannya hanya dua: mencetak
+kode OTP ke log Worker, dan menampilkan penanda data cache saat jaringan gagal. Jalur GeminiWeb
+**tidak** punya sakelar — ia dijaga denyut Studio Agent, jadi mematikan agennya sudah cukup dan
+memang itu cara yang benar. Lihat catatan di `worker/index.ts` bagian `Env`.

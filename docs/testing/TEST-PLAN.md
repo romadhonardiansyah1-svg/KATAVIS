@@ -43,6 +43,18 @@ palsu akan menyembunyikan justru masalah yang paling mungkin terjadi: batas 50 k
 
 Sasaran: logika murni tanpa I/O. Cepat, dijalankan setiap simpan berkas.
 
+### Layar masuk
+
+| ID | Kasus | Harapan |
+|---|---|---|
+| TC-U-AUTH-01 | Nomor ponsel ditulis dengan awalan, spasi, tanda hubung, titik, atau tanda kurung | Dinormalkan ke bentuk `+62...` yang diterima server |
+| TC-U-AUTH-02 | Nomor telepon rumah, kode negara lain, terlalu pendek, terlalu panjang, atau memuat huruf | Ditolak sebelum dikirim |
+| TC-U-AUTH-03 | Hitungan mundur kirim ulang | Dibulatkan ke atas, tidak pernah menampilkan angka negatif |
+
+TC-U-AUTH-01 dan TC-U-AUTH-02 menguji penyaringan yang menentukan apakah pengrajin masuk atau
+tidak. Kesalahan di sini muncul sebagai pesan yang menyalahkan pengguna atas tanda baca yang ia
+tulis dengan benar.
+
 ### Modul `rbac`
 
 | ID | Kasus | Harapan |
@@ -78,6 +90,19 @@ yang mengizinkan saat peran tidak dikenali adalah lubang keamanan.
 | TC-U-JOB-08 | Transisi status `queued`→`running`→`succeeded` | Urutan sah |
 | TC-U-JOB-09 | Transisi `succeeded`→`running` | Ditolak |
 | TC-U-JOB-10 | Kegagalan bahasa Jepang saat ID dan EN berhasil | Dua bahasa tersimpan, satu ditandai gagal |
+| TC-U-JOB-11 | Pesan antrian yang bentuknya tidak dikenal | Dilewati, tidak menggagalkan batch |
+| TC-U-JOB-12 | Pekerjaan yang barisnya sudah tidak `queued` | Tidak dikerjakan ulang, tidak memanggil penyedia |
+| TC-U-JOB-13 | Pekerjaan `tts` yang belum punya penyedia | Ditandai gagal dengan kode katalog, bukan melempar |
+| TC-U-JOB-14 | Penyedia melaporkan 429 | Pekerjaan dikembalikan ke antrian, bukan ditandai gagal |
+| TC-U-JOB-15 | Pekerjaan teks tanpa transkrip | Ditolak sebelum memanggil penyedia mana pun |
+| TC-U-JOB-16 | Balasan model berpagar blok kode | Tetap terbaca sebagai JSON |
+| TC-U-JOB-17 | Balasan model tanpa `name` atau `story` | Ditolak; kolom tidak diisi karangan |
+| TC-U-JOB-18 | Kegagalan gambar | `photo_original` tidak pernah tersentuh |
+
+TC-U-JOB-11 sampai TC-U-JOB-18 menguji consumer antrian — bagian yang baru punya arti setelah
+pekerjaan benar-benar dijalankan, bukan hanya dijadwalkan. TC-U-JOB-18 menegakkan aturan 7
+AGENTS.md: kegagalan generate mempertahankan foto pengrajin, dan itu diuji dengan memeriksa bahwa
+tidak ada satu pernyataan pun di jalur kegagalan yang menulis ke `photo_original`.
 
 TC-U-JOB-10 memverifikasi kriteria penerimaan F1 di PRD: kegagalan satu bahasa tidak menggagalkan
 yang lain. Ini alasan `product_content` dipisah per bahasa.
@@ -131,6 +156,9 @@ Dijalankan di `workerd` dengan D1 dan R2 lokal dari Miniflare.
 | TC-I-13 | Profil Accessibility Mode disimpan lalu sesi dimulai ulang | Pilihan profil pulih persis, termasuk gabungan profil |
 | TC-I-14 | Merekam tanpa persetujuan pengiriman audio tersimpan | Permintaan ditolak di server |
 | TC-I-15 | Menerbitkan tanpa persetujuan publikasi | Ditolak; status tetap `review` |
+| TC-I-16 | Baca objek media lewat URL bertanda tangan | Isi berkas terkirim dengan `Content-Type` yang benar |
+| TC-I-17 | URL baca media setelah kedaluwarsa | Ditolak |
+| TC-I-18 | `media[].url` pada katalog publik dan detail produk | Berupa URL yang dapat dimuat peramban, bukan kunci R2 mentah |
 
 TC-I-04 adalah pengujian keamanan paling penting di lapis ini. `Fitur pendukung.pdf` halaman 5
 menyatakan "Pengrajin dapat mencabut akses kapan saja". Pencabutan yang hanya mengubah baris basis
@@ -284,6 +312,9 @@ Pengujian ini menghitung kueri nyata, bukan mengandalkan tinjauan kode.
 | TC-SEC-19 | Header keamanan | CSP, X-Content-Type-Options, Referrer-Policy terpasang |
 | TC-SEC-20 | CORS | Hanya asal yang diizinkan |
 | TC-SEC-21 | Refresh token setelah 30 hari tidak aktif | Ditolak — menguji kebijakan sesi di PRD bagian 6 |
+| TC-SEC-22 | Tanda tangan URL baca media dipalsukan | Ditolak |
+| TC-SEC-23 | URL baca media diarahkan ke kunci di luar awalan `products/` | Ditolak |
+| TC-SEC-24 | Jenis MIME di luar daftar pada penyajian media | Dikirim sebagai `application/octet-stream` |
 
 TC-SEC-14 layak diperhatikan: respons yang berbeda untuk nomor terdaftar dan tidak terdaftar
 memungkinkan penyerang memetakan pengguna. Untuk platform yang melayani kelompok rentan, ini bukan

@@ -18,6 +18,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { readAccessToken } from "@/lib/session";
 import { readDraft, writeDraft } from "./draft-store";
 import {
   EMPTY_DRAFT,
@@ -86,6 +87,12 @@ export function useCreateFlow(step: StepId): CreateFlow {
     },
     [persist, router],
   );
+
+  useEffect(() => {
+    if (readAccessToken() === null) {
+      router.replace("/masuk");
+    }
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;

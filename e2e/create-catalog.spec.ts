@@ -143,7 +143,7 @@ async function stubMainFlowApi(page: Page): Promise<void> {
     apiOk({
       jobs: [
         { id: JOB_ID, kind: "copy", status: "queued" },
-        { id: "01J8ZQFX9K7YWVTN3MABCDJ02", kind: "image", status: "queued" },
+        { id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", status: "queued" },
       ],
     }),
   );
@@ -161,7 +161,7 @@ async function stubMainFlowApi(page: Page): Promise<void> {
           completedAt: Date.now(),
         },
         {
-          id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+          id: "01J8ZQFX9K7YWVTN3MABCDJ023",
           kind: "image",
           status: "succeeded",
           provider: "workers_ai",

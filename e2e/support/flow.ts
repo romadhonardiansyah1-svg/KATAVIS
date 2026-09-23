@@ -49,10 +49,10 @@ export const EMPTY_DRAFT: Draft = {
  * ULID 26 karakter Crockford base32 — bentuk yang diminta kontrak API
  * bagian 1. Huruf I, L, O, dan U tidak dipakai, dan `UlidSchema` menolaknya.
  */
-export const PRODUCT_ID = "01J8ZQFX9K7YWVTN3MABCDP01";
-export const MEDIA_ID = "01J8ZQFX9K7YWVTN3MABCDM01";
-export const JOB_ID = "01J8ZQFX9K7YWVTN3MABCDJ01";
-export const LINK_ID = "01J8ZQFX9K7YWVTN3MABCDL01";
+export const PRODUCT_ID = "01J8ZQFX9K7YWVTN3MABCDP012";
+export const MEDIA_ID = "01J8ZQFX9K7YWVTN3MABCDM012";
+export const JOB_ID = "01J8ZQFX9K7YWVTN3MABCDJ012";
+export const LINK_ID = "01J8ZQFX9K7YWVTN3MABCD1012";
 export const SLUG = "tas-kulit-nusantara";
 
 /** Halaman alur membaca drafnya dari IndexedDB, bukan dari server. */

@@ -57,7 +57,7 @@ test.describe("TC-E2E-07 ekspor PDF", () => {
     // `{ format, locale }`. Tidak ada endpoint lain yang menyediakan PDF.
     await stubApi(page, "GET", "/products/:id", () =>
       apiOk({
-        id: "01J8ZQFX9K7YWVTN3MABCDP01",
+        id: "01J8ZQFX9K7YWVTN3MABCDP012",
         status: "published",
         progress: 100,
         content: {
@@ -88,7 +88,7 @@ test.describe("TC-E2E-07 ekspor PDF", () => {
 
     await page.goto("/");
     const result = await page.evaluate(async () => {
-      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP01/export", {
+      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP012/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format: "pdf", locale: "id" }),
@@ -118,7 +118,7 @@ test.describe("TC-E2E-07 ekspor PDF", () => {
 
     await page.goto("/");
     await page.evaluate(async () => {
-      await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP01/export", {
+      await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP012/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format: "pdf", locale: "id" }),
@@ -154,7 +154,7 @@ test.describe("TC-E2E-08 ekspor feed CSV", () => {
 
     await page.goto("/");
     const body = await page.evaluate(async () => {
-      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP01/export", {
+      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP012/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format: "csv_merchant", locale: "id" }),
@@ -191,7 +191,7 @@ test.describe("TC-E2E-08 ekspor feed CSV", () => {
 
     await page.goto("/");
     const status = await page.evaluate(async () => {
-      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP01/export", {
+      const response = await fetch("http://localhost:8787/api/v1/products/01J8ZQFX9K7YWVTN3MABCDP012/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format: "docx", locale: "id" }),

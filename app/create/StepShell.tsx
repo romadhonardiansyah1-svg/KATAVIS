@@ -138,7 +138,15 @@ export function StepShell({
                 ini) tidak dirender sama sekali: baris kosong di bawah pesan
                 hanya menambah kebisingan di layar yang sedang bermasalah.
               */}
-              {actionLabel(error.action) === "" ? null : (
+              {actionLabel(error.action) === "" ? null : error.action === "LOGIN" ? (
+                <Link
+                  className={styles.errorAction}
+                  href="/masuk"
+                  style={{ display: "inline-block", textDecoration: "underline", fontWeight: 600 }}
+                >
+                  {actionLabel(error.action)} →
+                </Link>
+              ) : (
                 <p className={styles.errorAction}>{actionLabel(error.action)}</p>
               )}
             </div>

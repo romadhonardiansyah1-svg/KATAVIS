@@ -154,6 +154,19 @@ export default async function CatalogPage({
   const catalog = result.data;
   const primaryMedia = catalog.media[0] ?? null;
 
+  // Foto tanpa URL yang dapat dimuat diperlakukan sama dengan tidak ada
+  // foto. Menyerahkan `null` ke `src` menghasilkan permintaan ke alamat
+  // halaman itu sendiri dan sebuah kotak bergaris silang — di depan juri,
+  // itu terlihat sebagai kerusakan, bukan sebagai ketiadaan.
+  //
+  // Disaring di sini, bukan lewat bendera terpisah: menyempitkan tipe pada
+  // nilai yang benar-benar dipakai membuat `url` tidak lagi `string | null`
+  // di dalam cabang yang merendernya.
+  const photo =
+    primaryMedia !== null && primaryMedia.url !== null
+      ? { url: primaryMedia.url, altText: primaryMedia.altText }
+      : null;
+
   const fallbackStory =
     "Pengrajin belum menuliskan cerita untuk produk ini. Spesifikasi di bawah tetap memuat keterangan yang tersedia.";
 
@@ -183,7 +196,7 @@ export default async function CatalogPage({
       </header>
 
       <main className="catalog__main">
-        {primaryMedia === null ? (
+        {photo === null ? (
           <div className="catalog__photo">
             <div className="catalog__frame">
               <p className="catalog__photoAlt">
@@ -193,7 +206,7 @@ export default async function CatalogPage({
             </div>
           </div>
         ) : (
-          <PhotoFrame src={primaryMedia.url} altText={primaryMedia.altText} isPriority />
+          <PhotoFrame src={photo.url} altText={photo.altText} isPriority />
         )}
 
         <div className="catalog__story">

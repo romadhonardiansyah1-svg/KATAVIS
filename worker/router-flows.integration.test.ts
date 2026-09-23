@@ -145,6 +145,11 @@ describe("router — kelengkapan rute", () => {
       // Rute unggah bertanda tangan adalah mekanisme, bukan endpoint yang
       // didokumentasikan: kontrak hanya menulis uploadUrl sebagai "https://...".
       if (entry.pattern.endsWith("/media/upload/:token")) continue;
+      // Hal yang sama berlaku untuk pasangan bacanya. Kontrak menyatakan
+      // `media[].url` sebagai URL yang dapat dimuat peramban, tanpa pernah
+      // menamai rutenya — dan itu disengaja: bentuk tokennya adalah urusan
+      // dalam, bukan janji kepada klien. Keduanya muncul dan hilang bersama.
+      if (entry.pattern.endsWith("/media/:token")) continue;
       expect(documented.has(`${entry.method} ${entry.pattern}`)).toBe(true);
     }
   });
@@ -195,6 +200,61 @@ describe("router — alur media", () => {
     expect((await json(confirmed)) as { data: { uploadStatus: string } }).toMatchObject({
       data: { uploadStatus: "confirmed" },
     });
+  });
+
+  it("menyajikan byte media lewat URL bertanda tangan, bukan kunci R2", async () => {
+    // TC-I-16, TC-I-18.
+    //
+    // Cacat yang dijaga di sini pernah lolos ke setiap demo: `media[].url`
+    // berisi kunci R2 mentah, dan tidak ada rute yang menyajikan byte-nya.
+    // Setiap <img src> menunjuk alamat relatif terhadap origin aplikasi dan
+    // gagal 404 — seluruh katalog tampil tanpa foto.
+    //
+    // Dua hal yang membuatnya sulit terlihat, dan keduanya diuji di bawah:
+    // kunci R2 mentah adalah teks yang sah, sehingga tidak ada skema yang
+    // menolaknya; dan jawabannya 200, bukan galat.
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+
+    const requested = await call(
+      `/api/v1/products/${productId}/media/upload-url`,
+      auth(token, {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "photo_original",
+          mimeType: "image/jpeg",
+          bytes: JPEG_BYTES.length,
+        }),
+      }),
+    );
+    const upload = (await json(requested)) as { data: { mediaId: string; uploadUrl: string } };
+
+    await call(upload.data.uploadUrl.replace("https://api.example", ""), {
+      method: "PUT",
+      body: JPEG_BYTES,
+      headers: { "Content-Length": String(JPEG_BYTES.length) },
+    });
+    await call(
+      `/api/v1/products/${productId}/media/${upload.data.mediaId}/confirm`,
+      auth(token, { method: "POST" }),
+    );
+
+    const detail = await call(`/api/v1/products/${productId}`, auth(token));
+    const body = (await json(detail)) as { data: { media: { url: string | null }[] } };
+
+    expect(body.data.media.length).toBeGreaterThan(0);
+    const url = body.data.media[0]?.url ?? "";
+
+    // Bukan kunci R2 mentah — inilah yang lolos selama ini.
+    expect(url.startsWith("products/")).toBe(false);
+    expect(url.startsWith("https://")).toBe(true);
+
+    // Dan yang paling penting: URL-nya benar-benar mengembalikan gambarnya.
+    const served = await call(url.replace("https://api.example", ""));
+    expect(served.status).toBe(200);
+    expect(served.headers.get("Content-Type")).toBe("image/jpeg");
+    expect(served.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(JPEG_BYTES);
   });
 
   it("menolak berkas yang isinya bukan gambar meski namanya .jpg", async () => {

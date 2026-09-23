@@ -72,8 +72,10 @@ Mitigasi:
 3. Volume permintaan dibatasi wajar, tidak ada perulangan cepat.
 4. Workers AI selalu siap dan tidak bergantung pada akun mana pun.
 
-Bila terpicu: matikan jalur Gemini lewat feature flag, seluruh beban berpindah ke Workers AI.
-Dampaknya pada demo mendekati nol karena fallback sudah diuji.
+Bila terpicu: **hentikan proses Studio Agent.** Seluruh rantai Gemini hilang dalam hitungan detik
+karena tanpa denyut, rantai penyedia melewatinya sendiri (`worker/jobs/d1-agent.ts`). Tidak ada
+sakelar di Worker untuk ini, dan itu disengaja — lihat koreksi pada R-02 butir 4. Dampaknya pada
+demo mendekati nol karena fallback sudah diuji.
 
 ### R-05 — Akurasi ASR Bahasa Indonesia tidak memadai · Skor 12 (K4 × D3)
 
@@ -156,6 +158,63 @@ ditelusuri:
 
 Angka RAM tidak dijumlahkan langsung karena ketiganya tidak selalu berjalan bersamaan. Yang pasti:
 tanpa ADR-002 saja, mesin ini sudah kehabisan memori.
+
+### R-16 — Agen menganggur menghabiskan kuota Worker dan D1 · Skor 8 (K4 × D2)
+
+**Terukur, bukan dugaan.** Sesi 21–23 September menjalankan `pnpm run dev:worker` dan Studio
+Agent selama **33 jam 48 menit tanpa satu pun pekerjaan**. Log mencatat
+**310 panggilan `POST /agent/jobs/claim`** dan **43 heartbeat**, dengan **nol** penyelesaian
+pekerjaan (`agent/jobs/:id/complete`) dan **nol** katalog dibuat. Agen tidak melakukan apa pun
+selama itu — tetapi terus memanggil.
+
+Sebabnya dua konstanta yang masing-masing benar sendiri:
+
+| Konstanta | Nilai | Berkas |
+|---|---|---|
+| `IDLE_POLL_MS` | 2 detik | `agent/index.js` |
+| `HEARTBEAT_INTERVAL_MS` | 15 detik | `agent/heartbeat.js` |
+
+Digabungkan, agen menganggur menghasilkan:
+
+| | Per jam | 8 jam (hari demo) |
+|---|---|---|
+| Claim | 1.800 | 14.400 |
+| Heartbeat | 240 | 1.920 |
+| **Worker invocation** | **2.040** | **16.320** |
+| Kueri D1 | ~3.840 | ~30.720 |
+
+Setiap `/agent/jobs/claim` menjalankan **dua** kueri D1 — `d1LatestHeartbeat` lalu
+`d1ClaimImageJobs` — **meski antriannya kosong** (`worker/index.ts` baris 1430 dan 1438).
+
+**Yang tidak menjadi masalah.** Batas D1 paket gratis adalah 50 kueri **per invocation**, bukan
+per hari, dan 2 kueri per invocation jauh di bawahnya (R-08). Batas invocation harian Worker dan
+baris-dibaca D1 jauh lebih longgar daripada angka di atas. Jadi ini **bukan** risiko kehabisan
+kuota pada hari demo.
+
+**Yang menjadi masalah.** Dua hal, dan keduanya nyata:
+
+1. **Kebisingan log.** 16.320 baris `claim 200 OK` dalam delapan jam mengubur baris yang penting.
+   Pada demo, kode OTP dicetak di antara baris-baris itu, dan operator diminta membacanya di
+   panggung.
+2. **Agen menganggur menyembunyikan Worker yang mati.** Bila Worker berhenti sementara agen tetap
+   hidup, agen terus mencoba dan gagal — pada `IDLE_POLL_MS` 2 detik, itu log kegagalan setiap
+   dua detik yang mendorong keluar satu-satunya petunjuk yang berguna.
+
+**Mitigasi:**
+
+1. **Jalankan agen hanya saat dibutuhkan.** Rencana awal R-10 sudah menyebut ini; pengamatan ini
+   memberinya alasan kedua yang terukur, bukan hanya hemat RAM.
+2. **Matikan agen sebelum menutup terminal Worker.** Urutannya tidak dapat ditukar.
+3. **Jangan tinggalkan keduanya menyala semalaman.** Yang terjadi di sesi ini persis itu.
+4. Periksa port di log setelah agen dimatikan; `workerd` yatim menahan port (lihat catatan
+   operasional di bawah).
+
+**Bukan sesuatu yang diperbaiki sekarang.** Menambah jeda adaptif berarti mengubah konstanta di
+`agent/index.js`, dan itu menyentuh perilaku yang sudah diuji (TC-SA-05, polling 2 detik
+tercantum sebagai kontrak di `docs/spec/API-CONTRACT.md` baris 358). Perubahannya harus disengaja,
+bukan efek samping dari sesi perbaikan.
+
+---
 
 ## Risiko yang ditutup
 

@@ -345,7 +345,7 @@ describe("catalog — permintaan pemrosesan", () => {
         if (query.includes("FROM products")) return PRODUCT_ROW;
         if (query.includes("FROM caregiver_links")) {
           return {
-            id: "01J8ZQFX9K7YWVTN3MABCDL001",
+            id: "01J8ZQFX9K7YWVTN3MABCD1001",
             artisan_id: ARTISAN_ID,
             caregiver_id: CAREGIVER_ID,
             permissions: '["edit_draft"]',

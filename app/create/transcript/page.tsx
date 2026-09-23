@@ -37,15 +37,22 @@ function messageOf(code: keyof typeof ERROR_CATALOG): StepError {
 
 export default function TranscriptPage(): React.JSX.Element {
   const { draft, savedAt, isSaving, update, goTo } = useCreateFlow("transcript");
-  const [text, setText] = useState<string | null>(null);
+  const [text, setText] = useState<string | null>(() => draft?.transcript || null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<StepError | null>(null);
-  const loadedRef = useRef(false);
+  const loadedRef = useRef(Boolean(draft?.transcript && draft.transcript.length > 0));
 
   const productId = draft?.productId ?? null;
 
   useEffect(() => {
     if (productId === null || loadedRef.current) return;
+
+    // Jika pengguna melewati rekaman atau sudah ada teks di draft, langsung tampilkan
+    if (draft?.audioJobId === null || (draft?.transcript && draft.transcript.length > 0)) {
+      loadedRef.current = true;
+      setText(draft?.transcript ?? "");
+      return;
+    }
 
     let cancelled = false;
 
@@ -157,10 +164,22 @@ export default function TranscriptPage(): React.JSX.Element {
           <SpeakButton text={text ?? ""} label="Bacakan transkrip" />
         </div>
       ) : (
-        <p className={styles.loading} role="status">
-          <ClockIcon />
-          Menyiapkan transkrip cerita Anda...
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
+          <p className={styles.loading} role="status">
+            <ClockIcon />
+            Menunggu transkrip cerita Anda...
+          </p>
+          <button
+            type="button"
+            className={styles.secondaryLink}
+            onClick={() => {
+              loadedRef.current = true;
+              setText("");
+            }}
+          >
+            Tulis cerita sendiri tanpa menunggu transkrip
+          </button>
+        </div>
       )}
 
       <button

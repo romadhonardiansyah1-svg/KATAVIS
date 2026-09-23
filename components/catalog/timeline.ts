@@ -39,9 +39,32 @@ export const NarrationSchema = z.object({
 });
 
 export const CatalogMediaSchema = z.object({
-  url: z.string().min(1),
+  /**
+   * URL baca bertanda tangan. `null` bila server menolak mengarang URL
+   * untuk kunci yang tidak aman — halaman menampilkan keterangan "belum ada
+   * foto" alih-alih gambar rusak.
+   */
+  url: urlOrNull(),
   altText: z.string().nullable(),
 });
+
+/**
+ * URL yang benar-benar dapat dimuat, atau `null`.
+ *
+ * Bukan sekadar `z.string()`: nilai lama berupa kunci R2 mentah
+ * (`products/<ulid>/foto-asli.jpg`) juga berupa teks yang sah, dan itulah
+ * yang membuat cacatnya tidak terdeteksi — skema menerimanya, peramban
+ * gagal memuatnya. Bentuk yang diterima di sini hanya URL absolut.
+ */
+function urlOrNull() {
+  return z
+    .string()
+    .min(1)
+    .refine((value) => value.startsWith("http://") || value.startsWith("https://"), {
+      message: "Bukan URL absolut",
+    })
+    .nullable();
+}
 
 /**
  * Bentuk respons `GET /public/catalog/:slug`.

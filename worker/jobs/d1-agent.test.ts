@@ -160,15 +160,15 @@ describe("jobs/d1-agent — antrian", () => {
 
     await d1InsertJob(
       db,
-      { id: "01J8ZQFX9K7YWVTN3MABCDJ01", productId: "01J8ZQFX9K7YWVTN3MABCDP01", kind: "asr" },
+      { id: "01J8ZQFX9K7YWVTN3MABCDJ012", productId: "01J8ZQFX9K7YWVTN3MABCDP012", kind: "asr" },
       1_759_000_000_000,
     );
 
     expect(recorded[0]?.sql).toContain("'queued'");
     expect(recorded[0]?.sql).toContain("attempt");
     expect(recorded[0]?.values).toEqual([
-      "01J8ZQFX9K7YWVTN3MABCDJ01",
-      "01J8ZQFX9K7YWVTN3MABCDP01",
+      "01J8ZQFX9K7YWVTN3MABCDJ012",
+      "01J8ZQFX9K7YWVTN3MABCDP012",
       "asr",
       1_759_000_000_000,
     ]);
@@ -181,14 +181,14 @@ describe("jobs/d1-agent — antrian", () => {
       {
         all: [
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ01",
-            product_id: "01J8ZQFX9K7YWVTN3MABCDP01",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ012",
+            product_id: "01J8ZQFX9K7YWVTN3MABCDP012",
             payload: JSON.stringify({ prompt: "tas kulit di atas meja kayu" }),
             deadline_at: 1_759_000_045_000,
           },
         ],
       },
-      { all: [{ product_id: "01J8ZQFX9K7YWVTN3MABCDP01", r2_key: "products/p/foto-asli.jpg" }] },
+      { all: [{ product_id: "01J8ZQFX9K7YWVTN3MABCDP012", r2_key: "products/p/foto-asli.jpg" }] },
     ]);
 
     const claimed = await d1ClaimImageJobs(
@@ -205,8 +205,8 @@ describe("jobs/d1-agent — antrian", () => {
     expect(recorded).toHaveLength(2);
     expect(claimed).toEqual([
       {
-        id: "01J8ZQFX9K7YWVTN3MABCDJ01",
-        productId: "01J8ZQFX9K7YWVTN3MABCDP01",
+        id: "01J8ZQFX9K7YWVTN3MABCDJ012",
+        productId: "01J8ZQFX9K7YWVTN3MABCDP012",
         sourceImageUrl: "products/p/foto-asli.jpg",
         prompt: "tas kulit di atas meja kayu",
         deadlineAt: 1_759_000_045_000,

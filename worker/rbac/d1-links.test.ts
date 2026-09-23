@@ -77,9 +77,9 @@ function fakeD1(config: {
 }
 
 const LINK_ROW: CaregiverLinkRow = {
-  id: "01J8ZQFX9K7YWVTN3MABCDL01",
-  artisan_id: "01J8ZQFX9K7YWVTN3MABCDU01",
-  caregiver_id: "01J8ZQFX9K7YWVTN3MABCDU02",
+  id: "01J8ZQFX9K7YWVTN3MABCD1012",
+  artisan_id: "01J8ZQFX9K7YWVTN3MABCDV012",
+  caregiver_id: "01J8ZQFX9K7YWVTN3MABCDV023",
   permissions: '["edit_draft"]',
   status: "active",
   expires_at: 1_760_000_000_000,
@@ -94,8 +94,8 @@ describe("rbac/d1-links — undangan", () => {
     await d1CreateInvite(
       db,
       {
-        id: "01J8ZQFX9K7YWVTN3MABCDL01",
-        artisanId: "01J8ZQFX9K7YWVTN3MABCDU01",
+        id: "01J8ZQFX9K7YWVTN3MABCD1012",
+        artisanId: "01J8ZQFX9K7YWVTN3MABCDV012",
         invitePhone: "+6281200000002",
         inviteToken: "token-undangan",
         permissions: ["edit_draft"],
@@ -110,8 +110,8 @@ describe("rbac/d1-links — undangan", () => {
     expect(statement?.sql).toContain("NULL");
     expect(statement?.sql).toContain("'pending'");
     expect(statement?.values).toEqual([
-      "01J8ZQFX9K7YWVTN3MABCDL01",
-      "01J8ZQFX9K7YWVTN3MABCDU01",
+      "01J8ZQFX9K7YWVTN3MABCD1012",
+      "01J8ZQFX9K7YWVTN3MABCDV012",
       "+6281200000002",
       "token-undangan",
       '["edit_draft"]',
@@ -145,8 +145,8 @@ describe("rbac/d1-links — undangan", () => {
 
     const accepted = await d1AcceptInvite(
       db,
-      "01J8ZQFX9K7YWVTN3MABCDL01",
-      "01J8ZQFX9K7YWVTN3MABCDU02",
+      "01J8ZQFX9K7YWVTN3MABCD1012",
+      "01J8ZQFX9K7YWVTN3MABCDV023",
       1_759_500_000_000,
     );
 
@@ -161,7 +161,7 @@ describe("rbac/d1-links — undangan", () => {
     // tanpa perlu membaca statusnya lebih dulu.
     const { db } = fakeD1({ changes: 0 });
 
-    const accepted = await d1AcceptInvite(db, "01J8ZQFX9K7YWVTN3MABCDL01", "01J8ZQFX9K7YWVTN3MABCDU02", 1);
+    const accepted = await d1AcceptInvite(db, "01J8ZQFX9K7YWVTN3MABCD1012", "01J8ZQFX9K7YWVTN3MABCDV023", 1);
 
     expect(accepted).toBe(false);
   });
@@ -173,17 +173,17 @@ describe("rbac/d1-links — tautan", () => {
     // pasangannya tertukar, izin mengalir ke orang yang salah.
     const { db, recorded } = fakeD1({ first: LINK_ROW });
 
-    const link = await d1FindLinkFor(db, "01J8ZQFX9K7YWVTN3MABCDU02", "01J8ZQFX9K7YWVTN3MABCDU01");
+    const link = await d1FindLinkFor(db, "01J8ZQFX9K7YWVTN3MABCDV023", "01J8ZQFX9K7YWVTN3MABCDV012");
 
     expect(link).toEqual(LINK_ROW);
     expect(recorded[0]?.sql).toContain("WHERE caregiver_id = ? AND artisan_id = ?");
-    expect(recorded[0]?.values).toEqual(["01J8ZQFX9K7YWVTN3MABCDU02", "01J8ZQFX9K7YWVTN3MABCDU01"]);
+    expect(recorded[0]?.values).toEqual(["01J8ZQFX9K7YWVTN3MABCDV023", "01J8ZQFX9K7YWVTN3MABCDV012"]);
   });
 
   it("memuat tautan lewat id-nya", async () => {
     const { db, recorded } = fakeD1({ first: LINK_ROW });
 
-    const link = await d1FindLinkById(db, "01J8ZQFX9K7YWVTN3MABCDL01");
+    const link = await d1FindLinkById(db, "01J8ZQFX9K7YWVTN3MABCD1012");
 
     expect(link).toEqual(LINK_ROW);
     expect(recorded[0]?.sql).toContain("WHERE id = ?");
@@ -198,7 +198,7 @@ describe("rbac/d1-links — tautan", () => {
   it("mendaftar tautan milik pengrajin, terbaru lebih dulu", async () => {
     const { db, recorded } = fakeD1({ all: [LINK_ROW] });
 
-    const links = await d1ListLinksForArtisan(db, "01J8ZQFX9K7YWVTN3MABCDU01");
+    const links = await d1ListLinksForArtisan(db, "01J8ZQFX9K7YWVTN3MABCDV012");
 
     expect(links).toEqual([LINK_ROW]);
     expect(recorded[0]?.sql).toContain("WHERE artisan_id = ?");
@@ -210,7 +210,7 @@ describe("rbac/d1-links — tautan", () => {
     // galat tipe di sana, bukan keadaan kosong yang wajar.
     const { db } = fakeD1({ all: [] });
 
-    expect(await d1ListLinksForArtisan(db, "01J8ZQFX9K7YWVTN3MABCDU01")).toEqual([]);
+    expect(await d1ListLinksForArtisan(db, "01J8ZQFX9K7YWVTN3MABCDV012")).toEqual([]);
   });
 
   it("mencabut tautan tanpa menyentuh token_version — itu milik worker/auth", async () => {
@@ -219,7 +219,7 @@ describe("rbac/d1-links — tautan", () => {
     // tautan ditutup di sini, token dimatikan di `worker/auth`.
     const { db, recorded } = fakeD1({ changes: 1 });
 
-    const revoked = await d1RevokeLink(db, "01J8ZQFX9K7YWVTN3MABCDL01", 1_759_500_000_000);
+    const revoked = await d1RevokeLink(db, "01J8ZQFX9K7YWVTN3MABCD1012", 1_759_500_000_000);
 
     expect(revoked).toBe(true);
     expect(recorded[0]?.sql).toContain("SET status = 'revoked'");
@@ -230,6 +230,6 @@ describe("rbac/d1-links — tautan", () => {
   it("melaporkan gagal saat tautannya sudah dicabut", async () => {
     const { db } = fakeD1({ changes: 0 });
 
-    expect(await d1RevokeLink(db, "01J8ZQFX9K7YWVTN3MABCDL01", 1)).toBe(false);
+    expect(await d1RevokeLink(db, "01J8ZQFX9K7YWVTN3MABCD1012", 1)).toBe(false);
   });
 });

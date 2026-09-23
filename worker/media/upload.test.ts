@@ -265,7 +265,7 @@ describe("media — kunci R2", () => {
     ["..", "titik ganda"],
     ["products/other", "garis miring"],
     ["/etc/passwd", "garis miring depan"],
-    ["01J8ZQFX9K7YWVTN3MABCDP00/", "garis miring di akhir"],
+    ["01J8ZQFX9K7YWVTN3MABCDP001/", "garis miring di akhir"],
     ["", "kosong"],
     ["bukan-ulid", "bukan ULID"],
     ["01j8zqfx9k7ywvtn3mabcdp001", "huruf kecil"],

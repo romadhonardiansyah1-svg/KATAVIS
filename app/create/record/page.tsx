@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { ERROR_CATALOG } from "@/lib/errors";
 
 import { StepLoading, StepShell, type StepError } from "../StepShell";
-import { requestTranscription } from "../api";
+import { requestTranscription, setConsent } from "../api";
 import styles from "../flow.module.css";
 import { DocumentIcon, MicrophoneIcon, RefreshIcon, WarningIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
@@ -37,6 +37,7 @@ export default function RecordPage(): React.JSX.Element {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -57,6 +58,15 @@ export default function RecordPage(): React.JSX.Element {
 
   async function startRecording(): Promise<void> {
     setError(null);
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setError({
+        message:
+          "Peramban ini tidak mendukung akses mikrofon. Anda bisa memilih berkas rekaman suara atau langsung lewati ke penulisan cerita di bawah.",
+        action: "RETRY_RECORD",
+      });
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -79,18 +89,38 @@ export default function RecordPage(): React.JSX.Element {
       timerRef.current = window.setInterval(() => {
         setSeconds((current) => {
           const next = current + 1;
-          // Batas atas ditegakkan di sini, bukan hanya ditampilkan: rekaman
-          // yang melewati 60 detik ditolak server, dan menunggu sampai itu
-          // terjadi hanya membuang waktu pengrajin.
           if (next >= MAX_SECONDS) stopRecording();
           return next;
         });
       }, 1000);
-    } catch {
-      // Izin mikrofon ditolak. Tidak ada kode katalog untuk itu; yang
-      // dipakai adalah pesan rekam ulang, karena langkah berikutnya memang
-      // mencoba merekam lagi.
-      setError(messageOf("ASR_NO_SPEECH"));
+    } catch (err: unknown) {
+      const errorObj = err as { name?: string; message?: string };
+      if (
+        errorObj?.name === "NotAllowedError" ||
+        errorObj?.name === "SecurityError" ||
+        errorObj?.name === "PermissionDeniedError"
+      ) {
+        setError({
+          message:
+            "Izin mikrofon ditolak oleh browser atau Windows Privacy. Izinkan mikrofon di browser, atau pilih berkas rekaman suara / lewati ke penulisan cerita.",
+          action: "RETRY_RECORD",
+        });
+      } else if (
+        errorObj?.name === "NotFoundError" ||
+        errorObj?.name === "DevicesNotFoundError"
+      ) {
+        setError({
+          message:
+            "Perangkat mikrofon tidak terdeteksi pada laptop/HP ini. Anda bisa memilih berkas rekaman suara atau langsung lewati ke penulisan cerita.",
+          action: "RETRY_RECORD",
+        });
+      } else {
+        setError({
+          message:
+            "Gagal menyalakan mikrofon. Anda bisa memilih berkas rekaman suara atau langsung lewati ke penulisan cerita di bawah.",
+          action: "RETRY_RECORD",
+        });
+      }
     }
   }
 
@@ -127,6 +157,15 @@ export default function RecordPage(): React.JSX.Element {
     }
 
     setIsBusy(true);
+
+    // Pastikan persetujuan pemrosesan audio diberikan sebelum meminta transkripsi (TC-I-14)
+    const consented = await setConsent(token, "audio_processing", true);
+    if (!consented.ok) {
+      setIsBusy(false);
+      setError({ message: consented.error.message, action: consented.error.action });
+      return;
+    }
+
     const requested = await requestTranscription(token, productId, recording);
     setIsBusy(false);
 
@@ -222,6 +261,44 @@ export default function RecordPage(): React.JSX.Element {
             </span>
             Rekaman siap dikirim, {seconds} detik.
           </p>
+        ) : null}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              setRecording(file);
+              setSeconds(30);
+              setError(null);
+            }
+          }}
+        />
+
+        {!isRecording && recording === null ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem", width: "100%", alignItems: "center" }}>
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <DocumentIcon size={20} />
+              Atau pilih berkas rekaman suara
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => {
+                void goTo("transcript");
+              }}
+            >
+              <DocumentIcon size={20} />
+              Lewati rekaman (tulis cerita langsung)
+            </button>
+          </div>
         ) : null}
       </div>
 

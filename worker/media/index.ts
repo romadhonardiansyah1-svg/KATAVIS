@@ -47,3 +47,15 @@ export {
 } from "./d1-media";
 
 export type { MediaAssetRecord, UploadStatus } from "./d1-media";
+
+// Penyajian objek media ke peramban. Terpisah dari jalur unggah, meski
+// keduanya memakai pola tanda tangan yang sama — yang satu menulis, yang
+// lain membaca, dan masa berlakunya berbeda jauh.
+export {
+  MEDIA_READ_TTL_MS,
+  createSignedMediaUrl,
+  mediaContentType,
+  verifyMediaReadToken,
+} from "./serve";
+
+export type { MediaReadVerification } from "./serve";

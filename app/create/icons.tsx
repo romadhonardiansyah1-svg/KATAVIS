@@ -133,3 +133,29 @@ export function DocumentIcon({ size = 24 }: IconProps): React.JSX.Element {
     </svg>
   );
 }
+
+export function PhoneIcon({ size = 24 }: IconProps): React.JSX.Element {
+  return (
+    <svg {...frame(size)}>
+      <rect x="7" y="2" width="10" height="20" rx="2" />
+      <path d="M11 18h2" />
+    </svg>
+  );
+}
+
+/**
+ * Kunci — dipakai tombol "Masuk" dan bukan lambang keamanan.
+ *
+ * Ikonnya selalu berdampingan dengan label teks; aturan itu berlaku juga di
+ * sini, jadi kunci ini tidak pernah berdiri sendiri tanpa kata "Masuk".
+ */
+export function KeyIcon({ size = 24 }: IconProps): React.JSX.Element {
+  return (
+    <svg {...frame(size)}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 8-8" />
+      <path d="m17 6 2 2" />
+      <path d="m15 8 2 2" />
+    </svg>
+  );
+}

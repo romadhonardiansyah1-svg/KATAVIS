@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "katavis",
-      "database_id": "PLACEHOLDER_ISI_SETELAH_wrangler_d1_create",
+      "database_id": "68aa4781-8289-4ac7-88d7-a99bcca0197d",
       "migrations_dir": "migrations"
     }
   ],

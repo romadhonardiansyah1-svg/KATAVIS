@@ -252,6 +252,36 @@ Validasi server:
 | MIME bukan `image/jpeg`, `image/png`, `image/webp` | `UNSUPPORTED_FORMAT` |
 | MIME `image/svg+xml` | `UNSUPPORTED_FORMAT` — SVG dapat memuat skrip |
 
+### Membaca berkas media — `GET /media/:token`
+
+Bukan endpoint yang dinamai klien, melainkan pasangan baca dari URL bertanda tangan di atas. Ia
+muncul di dua tempat sebagai nilai `media[].url`: detail produk (§4) dan katalog publik (§10).
+
+```json
+// Yang diterima klien pada media[].url
+"http://127.0.0.1:8787/api/v1/media/eyJrZXkiOiJ...fQ.LLZPLH_H1mHfZ0UTWydS9XpLTr5cA-lQocDiwSouXQE"
+```
+
+Tokennya berisi kunci objek R2 dan masa berlakunya, ditandatangani HMAC-SHA256 dengan kunci yang
+sama seperti token unggah. Tiga konsekuensi yang perlu diketahui klien:
+
+| Sifat | Nilai |
+|---|---|
+| Masa berlaku | 24 jam — jauh lebih panjang dari URL unggah |
+| Sumber | ditandatangani saat tanggapan dibuat, jadi `url` dapat berubah antarpermintaan |
+| Kegagalan | `403 FORBIDDEN` bila tanda tangan tidak sah, kedaluwarsa, atau kuncinya di luar `products/`; `404 NOT_FOUND` bila objeknya memang sudah tidak ada |
+
+*Alasan umurnya 24 jam, bukan 15 menit.* URL ini tertanam di HTML katalog yang di-cache dan
+dikirim lewat WhatsApp; tautan yang mati dalam seperempat jam membuat pembeli melihat gambar rusak
+keesokan harinya. URL unggah tidak mengalami masalah itu karena hanya dipakai sekali, detik itu
+juga, oleh klien yang baru saja memintanya.
+
+*Catatan revisi 21 September 2026.* Sebelum ini `media[].url` berisi kunci R2 mentah
+(`products/01J.../foto-asli.jpg`) dan tidak ada satu pun rute yang melayani pembacaan byte dari
+R2. Akibatnya setiap gambar produk di demo menampilkan gambar rusak. Rute ini menutupnya, dan
+`CatalogMediaSchema` di `components/catalog/timeline.ts` kini menolak nilai yang bukan URL absolut
+— kunci R2 mentah juga berupa teks yang sah, dan justru itulah sebabnya cacat tersebut sempat lolos.
+
 ### `POST /products/:id/media/:mediaId/confirm`
 
 Dipanggil setelah `PUT` berhasil. Server memeriksa **magic bytes**, bukan ekstensi atau MIME yang

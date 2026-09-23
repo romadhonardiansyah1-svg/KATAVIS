@@ -22,13 +22,13 @@
 INSERT OR REPLACE INTO users
   (id, phone, display_name, role, locale, token_version, created_at)
 VALUES
-  ('01J8ZQFX9K7YWVTN3MABCDU01', '+6281200000001', 'Irsyad', 'artisan', 'id', 0, 1758000000000);
+  ('01J8ZQFX9K7YWVTN3MABCDV012', '+6281200000001', 'Irsyad', 'artisan', 'id', 0, 1758000000000);
 
 -- Produk terbit. `slug` harus sama dengan `SLUG` di `e2e/support/flow.ts`.
 INSERT OR REPLACE INTO products
   (id, artisan_id, status, slug, progress, created_at, updated_at, published_at)
 VALUES
-  ('01J8ZQFX9K7YWVTN3MABCDP01', '01J8ZQFX9K7YWVTN3MABCDU01', 'published',
+  ('01J8ZQFX9K7YWVTN3MABCDP012', '01J8ZQFX9K7YWVTN3MABCDV012', 'published',
    'tas-kulit-nusantara', 100, 1758000000000, 1758000100000, 1758000100000);
 
 -- Konten lima bahasa. `availableLocales` pada respons dihitung dari baris yang
@@ -38,35 +38,35 @@ VALUES
 INSERT OR REPLACE INTO product_content
   (id, product_id, locale, name, story, specs, social_copy, seo_keywords, source, updated_at)
 VALUES
-  ('01J8ZQFX9K7YWVTN3MABCDC01', '01J8ZQFX9K7YWVTN3MABCDP01', 'id',
+  ('01J8ZQFX9K7YWVTN3MABCDC012', '01J8ZQFX9K7YWVTN3MABCDP012', 'id',
    'Tas Kulit Nusantara',
    'Tas ini dibuat dari kulit sapi samak nabati, dijahit tangan selama tiga hari.',
    '["Kulit sapi nabati","Dijahit tangan","30 x 20 cm"]',
    'Tas kulit asli, dijahit tangan.',
    '["tas kulit","kerajinan tangan"]', 'ai_edited', 1758000100000),
 
-  ('01J8ZQFX9K7YWVTN3MABCDC02', '01J8ZQFX9K7YWVTN3MABCDP01', 'en',
+  ('01J8ZQFX9K7YWVTN3MABCDC023', '01J8ZQFX9K7YWVTN3MABCDP012', 'en',
    'Nusantara Leather Bag',
    'This bag is made from vegetable-tanned cowhide, hand-stitched over three days.',
    '["Vegetable-tanned cowhide","Hand-stitched","30 x 20 cm"]',
    'Genuine leather bag, hand-stitched.',
    '["leather bag","handmade"]', 'ai', 1758000100000),
 
-  ('01J8ZQFX9K7YWVTN3MABCDC03', '01J8ZQFX9K7YWVTN3MABCDP01', 'ja',
+  ('01J8ZQFX9K7YWVTN3MABCDC034', '01J8ZQFX9K7YWVTN3MABCDP012', 'ja',
    'ヌサンタラ革のバッグ',
    'このバッグは植物タンニンなめしの牛革で作られています。',
    '["植物タンニンなめし牛革","手縫い","30 x 20 cm"]',
    '本革のバッグ、手縫い。',
    '["革のバッグ","手作り"]', 'ai', 1758000100000),
 
-  ('01J8ZQFX9K7YWVTN3MABCDC04', '01J8ZQFX9K7YWVTN3MABCDP01', 'zh',
+  ('01J8ZQFX9K7YWVTN3MABCDC045', '01J8ZQFX9K7YWVTN3MABCDP012', 'zh',
    '努桑塔拉皮革包',
    '这款包采用植鞣牛皮制成，手工缝制。',
    '["植鞣牛皮","手工缝制","30 x 20 cm"]',
    '真皮包，手工缝制。',
    '["皮包","手工"]', 'ai', 1758000100000),
 
-  ('01J8ZQFX9K7YWVTN3MABCDC05', '01J8ZQFX9K7YWVTN3MABCDP01', 'ar',
+  ('01J8ZQFX9K7YWVTN3MABCDC056', '01J8ZQFX9K7YWVTN3MABCDP012', 'ar',
    'حقيبة جلدية نوسانتارا',
    'هذه الحقيبة مصنوعة من جلد البقر المدبوغ نباتياً.',
    '["جلد بقري مدبوغ نباتياً","مخيط يدوياً","30 × 20 سم"]',
@@ -80,7 +80,7 @@ INSERT OR REPLACE INTO media_assets
   (id, product_id, kind, r2_key, mime_type, bytes, alt_text, provider,
    is_primary, upload_status, created_at)
 VALUES
-  ('01J8ZQFX9K7YWVTN3MABCDM01', '01J8ZQFX9K7YWVTN3MABCDP01', 'photo_original',
-   'products/01J8ZQFX9K7YWVTN3MABCDP01/foto-asli.jpg', 'image/jpeg', 184320,
+  ('01J8ZQFX9K7YWVTN3MABCDM012', '01J8ZQFX9K7YWVTN3MABCDP012', 'photo_original',
+   'products/01J8ZQFX9K7YWVTN3MABCDP012/foto-asli.jpg', 'image/jpeg', 184320,
    'Tas kulit cokelat dijahit tangan di atas meja kayu', NULL, 1, 'confirmed',
    1758000000000);

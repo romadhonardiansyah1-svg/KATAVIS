@@ -71,8 +71,8 @@ test.describe("TC-E2E-10 Studio Agent mati", () => {
     await stubApi(page, "POST", "/products/:id/generate", () =>
       apiOk({
         jobs: [
-          { id: "01J8ZQFX9K7YWVTN3MABCDJ01", kind: "copy", status: "queued" },
-          { id: "01J8ZQFX9K7YWVTN3MABCDJ02", kind: "image", status: "queued" },
+          { id: "01J8ZQFX9K7YWVTN3MABCDJ012", kind: "copy", status: "queued" },
+          { id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", status: "queued" },
         ],
       }),
     );
@@ -84,14 +84,14 @@ test.describe("TC-E2E-10 Studio Agent mati", () => {
       apiOk({
         jobs: [
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ01",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ012",
             kind: "copy",
             status: "succeeded",
             provider: "9router",
             progress: 100,
           },
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ023",
             kind: "image",
             status: "succeeded",
             provider: "workers_ai",
@@ -122,7 +122,7 @@ test.describe("TC-E2E-11 Studio Agent menggantung", () => {
     await seedAccessToken(page);
     await seedDraft(page, DRAFT_AT_PROCESS);
     await stubApi(page, "POST", "/products/:id/generate", () =>
-      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ02", kind: "image", status: "queued" }] }),
+      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", status: "queued" }] }),
     );
 
     let polls = 0;
@@ -134,7 +134,7 @@ test.describe("TC-E2E-11 Studio Agent menggantung", () => {
         return apiOk({
           jobs: [
             {
-              id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+              id: "01J8ZQFX9K7YWVTN3MABCDJ023",
               kind: "image",
               status: "running",
               provider: "gemini_web",
@@ -149,7 +149,7 @@ test.describe("TC-E2E-11 Studio Agent menggantung", () => {
       return apiOk({
         jobs: [
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ023",
             kind: "image",
             status: "succeeded",
             provider: "workers_ai",
@@ -180,7 +180,7 @@ test.describe("TC-E2E-12 Groq mengembalikan 429", () => {
     await seedDraft(page, {
       productId: PRODUCT_ID,
       photoMediaId: MEDIA_ID,
-      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ01",
+      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ012",
     });
 
     let attempts = 0;
@@ -256,7 +256,7 @@ test.describe("TC-E2E-14 jaringan putus saat merekam", () => {
     await seedDraft(page, {
       productId: PRODUCT_ID,
       photoMediaId: MEDIA_ID,
-      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ01",
+      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ012",
     });
 
     await offline(page);
@@ -280,7 +280,7 @@ test.describe("TC-E2E-14 jaringan putus saat merekam", () => {
     await seedDraft(page, {
       productId: PRODUCT_ID,
       photoMediaId: MEDIA_ID,
-      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ01",
+      audioJobId: "01J8ZQFX9K7YWVTN3MABCDJ012",
     });
 
     await offline(page);
@@ -304,7 +304,7 @@ test.describe("TC-E2E-15 jaringan putus saat pemrosesan", () => {
     await seedAccessToken(page);
     await seedDraft(page, DRAFT_AT_PROCESS);
     await stubApi(page, "POST", "/products/:id/generate", () =>
-      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ02", kind: "image", status: "queued" }] }),
+      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", status: "queued" }] }),
     );
 
     // Jaringan putus setelah pemrosesan diminta, tetapi sebelum selesai.
@@ -315,7 +315,7 @@ test.describe("TC-E2E-15 jaringan putus saat pemrosesan", () => {
         return apiOk({
           jobs: [
             {
-              id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+              id: "01J8ZQFX9K7YWVTN3MABCDJ023",
               kind: "image",
               status: "running",
               provider: "workers_ai",
@@ -329,7 +329,7 @@ test.describe("TC-E2E-15 jaringan putus saat pemrosesan", () => {
       return apiOk({
         jobs: [
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ023",
             kind: "image",
             status: "succeeded",
             provider: "workers_ai",
@@ -361,13 +361,13 @@ test.describe("TC-E2E-16 tab ditutup di tengah proses", () => {
     await seedAccessToken(page);
     await seedDraft(page, DRAFT_AT_PROCESS);
     await stubApi(page, "POST", "/products/:id/generate", () =>
-      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ02", kind: "image", status: "running" }] }),
+      apiOk({ jobs: [{ id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", status: "running" }] }),
     );
     await stubApi(page, "GET", "/products/:id/jobs", () =>
       apiOk({
         jobs: [
           {
-            id: "01J8ZQFX9K7YWVTN3MABCDJ02",
+            id: "01J8ZQFX9K7YWVTN3MABCDJ023",
             kind: "image",
             status: "running",
             provider: "workers_ai",

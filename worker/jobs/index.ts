@@ -73,3 +73,24 @@ export {
 } from "./d1-agent";
 
 export type { AgentHeartbeat, ClaimedJob, LatestHeartbeat } from "./d1-agent";
+
+// Consumer antrian: jalur yang harus bekerja tanpa Studio Agent sama sekali.
+export { parseJobMessage, processJob } from "./consumer";
+
+export type { ConsumerDependencies, ConsumerEnv, JobMessage, JobOutcome } from "./consumer";
+
+// Penyedia AI konkret. Bentuknya di `providers.ts`, implementasinya di sini.
+export {
+  buildCopyPrompt,
+  createGroqTranscriptionProvider,
+  createNineRouterTextProvider,
+  createWorkersAiImageProvider,
+  createWorkersAiTextProvider,
+  createWorkersAiTranscriptionProvider,
+  createCacheImageProvider,
+  parseCopyResponse,
+} from "./providers-impl";
+
+export { buildImagePrompt, parseImagePayload } from "./payload";
+
+export type { ImageJobPayload } from "./payload";
