@@ -561,13 +561,27 @@ describe("catalog — transkrip", () => {
     expect(update?.params[1]).toBe(1);
   });
 
-  it("menolak tinjauan atas transkrip yang tidak ada", async () => {
-    const fake = fakeDb({ first: () => null });
-
-    expect(await submitTranscript(fake.db, PRODUCT_ID, "Teks", NOW_MS)).toEqual({
-      ok: false,
-      code: "NOT_FOUND",
+  it("membuat transkrip baru bertanda manual jika pengrajin mengetik langsung", async () => {
+    let called = 0;
+    const fake = fakeDb({
+      first: () => {
+        called++;
+        if (called === 1) return null;
+        return {
+          text: "Teks langsung",
+          locale: "id",
+          reviewed: 1,
+          edited: 1,
+          provider: "manual",
+          duration_ms: 0,
+        };
+      },
     });
+
+    const result = await submitTranscript(fake.db, PRODUCT_ID, "Teks langsung", NOW_MS);
+    expect(result.ok).toBe(true);
+    const insert = fake.singles.find((stmt) => stmt.query.includes("INSERT INTO transcripts"));
+    expect(insert).toBeDefined();
   });
 
   it.each([

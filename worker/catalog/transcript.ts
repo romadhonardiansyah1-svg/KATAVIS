@@ -144,9 +144,19 @@ export async function submitTranscript(
   if (!parsed.success) return { ok: false, code: "TRANSCRIPT_NOT_REVIEWED" };
 
   const existing = await loadTranscript(db, productId);
-  // Tidak ada transkrip berarti tidak ada yang dapat ditinjau. Menolaknya
-  // lebih benar daripada membuat baris kosong yang tampak sudah diperiksa.
-  if (existing === null) return { ok: false, code: "NOT_FOUND" };
+  if (existing === null) {
+    // Pengrajin mengetik/mengisi transkrip secara langsung tanpa melalui ASR,
+    // atau transkrip belum terbuat. Buat baris baru sebagai 'manual'.
+    const transcriptId = ulid();
+    await db.run({
+      query: `INSERT INTO transcripts
+                (id, product_id, text, locale, reviewed, edited, provider, duration_ms, created_at, reviewed_at)
+              VALUES (?, ?, ?, 'id', 1, 1, 'manual', 0, ?, ?)`,
+      params: [transcriptId, productId, parsed.data.text, nowMs, nowMs],
+    });
+
+    return { ok: true, transcript: await loadTranscript(db, productId) };
+  }
 
   const edited = existing.edited || existing.text !== parsed.data.text;
 
