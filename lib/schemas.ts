@@ -80,8 +80,8 @@ export const LIMITS = {
   MAX_PAGE_SIZE: 20,
   /** Kontrak API bagian 7. */
   MAX_JOB_ATTEMPTS: 3,
-  /** ADR-004. Batas waktu keras jalur Gemini. */
-  GEMINI_TIMEOUT_MS: 45_000,
+  /** ADR-004. Batas waktu keras jalur Gemini (90 detik, cukup untuk upload foto + generate). */
+  GEMINI_TIMEOUT_MS: 90_000,
   /** Kontrak API bagian 8. Agen tanpa heartbeat dianggap mati. */
   AGENT_HEARTBEAT_TIMEOUT_MS: 30_000,
   /** Undangan pendamping. Diuji di TC-U-RBAC-13. */

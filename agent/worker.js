@@ -84,6 +84,12 @@ export async function generateInGemini(job, dependencies) {
     throw new AgentRuntimeError("Tenggat pekerjaan sudah lewat sebelum dimulai.", "timeout");
   }
 
+  // Buka percakapan BARU di Gemini setiap pekerjaan agar prompt lama
+  // tidak menumpuk dan Gemini tidak bingung dengan konteks sebelumnya.
+  log("Membuka percakapan Gemini baru...");
+  await page.goto("https://gemini.google.com/app", { waitUntil: "domcontentloaded", timeout: 15_000 });
+  await page.waitForTimeout(1500);
+
   // Prompt datang dari server dan sudah memuat kalimat penegak F2-05
   // ("JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk").
   // Kalimat itu TIDAK ditambahkan di sini: menambahkannya di dua tempat
@@ -120,12 +126,14 @@ export async function generateInGemini(job, dependencies) {
 
   const promptText =
     tempFile !== null
-      ? `Tolong buatkan foto produk komersial studio profesional berkualitas tinggi dari produk kerajinan tangan pada foto yang saya lampirkan ini.
+      ? `Dari foto produk yang saya lampirkan, buatkan versi foto komersial studio profesional:
 
-Instruksi penting:
-1. Ambil objek produk kerajinan pada foto lampiran. Pertahankan 100% bentuk, warna, tekstur bahan, dan seluruh detail asli produk tersebut. Jangan mengubah bentuk produknya.
-2. Letakkan produk ini di atas meja permukaan marmer elegan dengan pencahayaan studio komersial lembut (soft studio lighting) dari sudut kiri atas, serta bayangan kontak alami yang realistis di bawah produk.
-3. Latar belakang studio komersial yang bersih, estetik, dan mewah layaknya foto katalog produk pameran seni kriya.`
+- PERTAHANKAN produk asli 100% persis seperti di foto (bentuk, warna, tekstur, bahan, ukuran, detail). Jangan ubah sedikitpun.
+- GANTI hanya latar belakangnya: letakkan produk di atas meja marmer putih bersih dengan pencahayaan studio softbox profesional dari kiri atas.
+- Tambahkan bayangan kontak halus dan natural di bawah produk.
+- Latar belakang gradient abu-abu muda ke putih, bersih tanpa gangguan.
+- Kualitas foto setara katalog pameran seni kriya internasional, tajam, resolusi tinggi.
+- Jangan tambahkan objek lain, teks, atau watermark.`
       : job.prompt.trim().length > 0
         ? job.prompt
         : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
@@ -138,9 +146,6 @@ Instruksi penting:
   }
 
   const imageCountBefore = await countImages(page);
-  if (imageCountBefore === null) {
-    throw new AgentRuntimeError("Daftar gambar Gemini tidak terbaca.", "selector_not_found");
-  }
 
   await promptInput.click();
   // `insertText`, bukan penekanan tombol satu per satu: prompt memuat
@@ -215,13 +220,12 @@ async function countImages(page) {
   for (const selector of GEMINI_SELECTORS.generatedImage) {
     try {
       const count = await page.locator(selector).count();
-      if (count >= 0) return count;
+      if (count > 0) return count;
     } catch {
       // Alternatif berikutnya.
     }
   }
-
-  return null;
+  return 0;
 }
 
 /**

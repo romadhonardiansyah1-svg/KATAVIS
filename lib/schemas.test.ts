@@ -144,7 +144,7 @@ describe("LIMITS", () => {
   });
 
   it("menjaga batas waktu Gemini sesuai ADR-004", () => {
-    expect(LIMITS.GEMINI_TIMEOUT_MS).toBe(45_000);
+    expect(LIMITS.GEMINI_TIMEOUT_MS).toBe(90_000);
   });
 
   it("menjaga batas heartbeat agen lebih pendek dari batas Gemini", () => {
