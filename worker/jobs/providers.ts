@@ -167,4 +167,11 @@ export const IMAGE_CHAIN: readonly ProviderId[] = [
 
 export const TRANSCRIPTION_CHAIN: readonly ProviderId[] = ["groq", "workers_ai"];
 
-export const TEXT_CHAIN: readonly ProviderId[] = ["9router", "workers_ai"];
+/**
+ * Groq WAJIB pertama: tercepat (~2 detik) dan gratis. Sebelum perbaikan ini
+ * urutannya ["9router", "workers_ai"] sehingga penyedia Groq yang sudah
+ * dibangun tidak pernah dipakai — rantai hanya mencoba 2 lapis dan
+ * `Menyusun cerita` gagal setiap kali 9router lambat dan Workers AI
+ * mengarang non-JSON.
+ */
+export const TEXT_CHAIN: readonly ProviderId[] = ["groq", "9router", "workers_ai"];

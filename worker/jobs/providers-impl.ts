@@ -45,7 +45,12 @@ import {
 const IMAGE_TIMEOUT_MS = 30_000;
 const CACHE_TIMEOUT_MS = 5_000;
 const ASR_TIMEOUT_MS = 20_000;
-const TEXT_TIMEOUT_MS = 20_000;
+/**
+ * Batas per lapis teks. `ag/gemini-3.8-flash-high` lewat SSE terukur 11-12
+ * detik; 20 detik terlalu mepet saat proksi sedang lambat dan memutus
+ * balasan yang sebenarnya sah.
+ */
+const TEXT_TIMEOUT_MS = 30_000;
 
 /**
  * Model Workers AI.

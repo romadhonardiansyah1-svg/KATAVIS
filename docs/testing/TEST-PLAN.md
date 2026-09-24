@@ -99,6 +99,7 @@ yang mengizinkan saat peran tidak dikenali adalah lubang keamanan.
 | TC-U-JOB-17 | Balasan model tanpa `name` atau `story` | Ditolak; kolom tidak diisi karangan |
 | TC-U-JOB-18 | Kegagalan gambar | `photo_original` tidak pernah tersentuh |
 | TC-U-JOB-19 | Balasan model bentuk SSE | Digabung dari potongan delta, bukan dibuang |
+| TC-U-JOB-20 | Urutan rantai teks | Groq pertama, lalu 9router, lalu Workers AI |
 
 TC-U-JOB-11 sampai TC-U-JOB-18 menguji consumer antrian — bagian yang baru punya arti setelah
 pekerjaan benar-benar dijalankan, bukan hanya dijadwalkan. TC-U-JOB-18 menegakkan aturan 7

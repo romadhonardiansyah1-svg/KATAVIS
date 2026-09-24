@@ -28,6 +28,7 @@ import {
 import { canRetryJob, canTransition, isTerminal } from "./lifecycle";
 import {
   ProviderError,
+  TEXT_CHAIN,
   type Content,
   type ImageProvider,
   type ImageRequest,
@@ -653,5 +654,15 @@ describe("jobs/chain — rantai transkripsi", () => {
     if (outcome.ok) return;
     expect(outcome.failure.layersTried).toBe(2);
     expect(outcome.failure.provider).toBe("workers_ai");
+  });
+});
+
+describe("jobs/chain — urutan rantai teks", () => {
+  it("menempatkan groq pertama, sebelum 9router dan workers_ai", () => {
+    // TC-U-JOB-20. Groq tercepat (~2 detik) dan gratis; rantai yang tidak
+    // mencantumkannya diam-diam hanya mencoba 2 lapis. `buildChain`
+    // melewatkan penyedia yang tidak terdaftar tanpa peringatan, jadi
+    // urutan ini harus dikunci tes — bukan dipercaya dari ingatan.
+    expect(TEXT_CHAIN).toEqual(["groq", "9router", "workers_ai"]);
   });
 });

@@ -1020,7 +1020,7 @@ route("POST", `${API_PREFIX}/products/:id/image-prompt`, "session", async (conte
  *
  * Rantai teks yang sama dengan copywriting (Groq → 9router → Workers AI),
  * tetapi meminta TEKS prompt mentah, bukan JSON katalog. Setiap lapis
- * dibatasi 20 detik; yang pertama mengembalikan teks valid menang.
+ * dibatasi 30 detik; yang pertama mengembalikan teks valid menang.
  * Mengembalikan `null` bila seluruh lapis gagal — pemanggil memakai prompt
  * otomatis sebagai cadangan, bukan menampilkan galat.
  */
@@ -1087,7 +1087,7 @@ async function fetchChatText(
       ],
       temperature: 0.5,
     }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) return null;
@@ -1102,7 +1102,7 @@ async function fetchWorkersAiText(env: Env, instruction: string): Promise<string
     const response = (await env.AI.run(
       WORKERS_AI_TEXT_MODEL as never,
       { messages: [{ role: "user", content: instruction }] } as never,
-      { signal: AbortSignal.timeout(20_000) } as never,
+      { signal: AbortSignal.timeout(30_000) } as never,
     )) as unknown;
 
     if (typeof response !== "object" || response === null) return null;
@@ -1735,6 +1735,14 @@ route("POST", `${API_PREFIX}/agent/jobs/:jobId/fail`, "agent", async (context) =
     context.nowMs,
   );
   if (!returned) return apiError("NOT_FOUND");
+
+  // Tanpa pesan antrian baru, pekerjaan yang dikembalikan hanya duduk
+  // berstatus `queued` selamanya: pesan aslinya sudah diakui saat agen
+  // mengklaim. Inilah yang membuat fallback tidak pernah berjalan.
+  const job = await d1FindJob(context.env.DB, jobId);
+  if (job !== null) {
+    await enqueueJobs(context, [{ id: jobId, productId: job.productId, kind: "image" }]);
+  }
 
   return apiOk({ id: jobId, status: "queued", provider: "workers_ai" });
 });
