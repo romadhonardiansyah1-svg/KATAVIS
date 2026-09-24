@@ -27,7 +27,7 @@ import { AgentRuntimeError, GEMINI_SELECTORS, reasonFromFailure } from "./chrome
 import { ApiRequestError } from "./api.js";
 
 /** Batas waktu ajakan gambar muncul, dihitung dari deadlineAt server. */
-const IMAGE_APPEAR_CEILING_MS = 20_000;
+const IMAGE_APPEAR_CEILING_MS = 60_000;
 
 /**
  * Sisa waktu terhadap deadline absolut.
@@ -195,7 +195,7 @@ async function waitForImage(job, context) {
   // lalu kehabisan waktu saat mengunduh akan membuang hasil yang sudah jadi.
   const budget = Math.min(
     IMAGE_APPEAR_CEILING_MS,
-    Math.max(1_000, Math.floor(remainingMs(job.deadlineAt, Date.now()) * 0.6)),
+    Math.max(15_000, remainingMs(job.deadlineAt, Date.now())),
   );
   const until = Date.now() + budget;
 

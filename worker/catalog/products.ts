@@ -491,6 +491,14 @@ export async function requestGeneration(
 
   const jobs: QueuedJob[] = [];
 
+  const transcriptRecord = await db.first<{ text: string }>({
+    query: "SELECT text FROM transcripts WHERE product_id = ? LIMIT 1",
+    params: [productId],
+  });
+  const productDesc = transcriptRecord?.text
+    ? `produk: "${transcriptRecord.text}"`
+    : "produk kerajinan tangan Nusantara";
+
   // Semua pekerjaan masuk dalam satu putaran. Membuatnya satu per satu akan
   // menunda pekerjaan pertama sampai yang terakhir selesai ditulis, dan
   // membuat jumlah kueri tumbuh seiring jumlah bahasa.
@@ -502,9 +510,7 @@ export async function requestGeneration(
       entry.kind === "image"
         ? JSON.stringify({
             style: parsed.data.imageStyle ?? "studio",
-            prompt: `Buat foto produk studio profesional dari foto produk kerajinan ini dengan gaya ${
-              parsed.data.imageStyle ?? "studio"
-            }. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.`,
+            prompt: `Buat foto produk studio profesional berkualitas tinggi untuk ${productDesc}. Tampilkan produk ini di atas meja marmer elegan dengan pencahayaan studio lembut. Latar bersih studio komersial. JANGAN mengubah detail produk, pertahankan seluruh tekstur dan bentuk apa adanya.`,
           })
         : null;
 

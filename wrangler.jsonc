@@ -53,7 +53,7 @@
   "vars": {
     "ENVIRONMENT": "development",
     "DEMO_MODE": "false",
-    "GEMINI_TIMEOUT_MS": "45000",
+    "GEMINI_TIMEOUT_MS": "65000",
     "AGENT_HEARTBEAT_TIMEOUT_MS": "30000"
   }
 

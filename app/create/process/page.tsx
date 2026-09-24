@@ -128,9 +128,18 @@ export default function ProcessPage(): React.JSX.Element {
 
   if (draft === null) return <StepLoading />;
 
-  const failed = jobs.find((job) => job.status === "failed");
+  // Tampilkan hanya pekerjaan terbaru per jenis agar riwayat percobaan
+  // sebelumnya tidak menumpuk di layar.
+  const latestJobs = Object.values(
+    jobs.reduce<Record<string, JobView>>((acc, job) => {
+      acc[job.kind] = job;
+      return acc;
+    }, {}),
+  );
+
+  const failed = latestJobs.find((job) => job.status === "failed");
   const failure = failed?.error ?? null;
-  const finished = jobs.length > 0 && jobs.every((job) => TERMINAL.includes(job.status));
+  const finished = latestJobs.length > 0 && latestJobs.every((job) => TERMINAL.includes(job.status));
 
   return (
     <StepShell
@@ -178,7 +187,7 @@ export default function ProcessPage(): React.JSX.Element {
       </div>
 
       <ul className={styles.stageList}>
-        {jobs.map((job) => (
+        {latestJobs.map((job) => (
           <li key={job.id} className={styles.statusRow}>
             <span
               className={
