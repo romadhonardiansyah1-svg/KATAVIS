@@ -458,6 +458,35 @@ memperlambat siapa pun.
 Kegagalan mengembalikan pekerjaan ke antrian dengan penanda `gemini_failed`, lalu consumer
 Workers AI mengambilnya.
 
+### `POST /agent/jobs/:jobId/upload-url`
+
+Menerbitkan URL unggah untuk hasil Studio Agent. Cerminan rute sesi
+`POST /products/:id/media/upload-url`, tetapi berotorisasi kunci agen:
+agen tidak memegang token sesi pengrajin. Jenis aset selalu
+`photo_studio` milik produk pada pekerjaan itu.
+
+```json
+// Permintaan
+{ "mimeType": "image/png", "bytes": 184320 }
+
+// Respons
+{ "ok": true, "data": { "mediaId": "01J...", "uploadUrl": "https://...", "expiresAt": 175... } }
+```
+
+### `POST /agent/jobs/:jobId/confirm-upload`
+
+Mengonfirmasi berkas yang baru diunggah agen (magic bytes, lalu
+`confirmed`) dan mengembalikan `r2Key` untuk dipakai pada `/complete`.
+Menolak aset milik produk lain dengan `NOT_FOUND`.
+
+```json
+// Permintaan
+{ "mediaId": "01J..." }
+
+// Respons
+{ "ok": true, "data": { "mediaId": "01J...", "r2Key": "products/01J.../studio-01J....png", "bytes": 184320 } }
+```
+
 ### `GET /agent/jobs/:jobId/source-image`
 
 Mengunduh foto asli produk sebagai biner, supaya agen dapat melampirkannya

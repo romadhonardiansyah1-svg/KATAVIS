@@ -1739,6 +1739,107 @@ route("POST", `${API_PREFIX}/agent/jobs/:jobId/fail`, "agent", async (context) =
   return apiOk({ id: jobId, status: "queued", provider: "workers_ai" });
 });
 
+/**
+ * URL unggah hasil Studio Agent — `POST /agent/jobs/:jobId/upload-url`.
+ *
+ * Rute agen, BUKAN rute sesi: Studio Agent hanya memegang `X-Agent-Key`,
+ * bukan token sesi pengrajin, sehingga rute sesi
+ * `POST /products/:id/media/upload-url` selalu menolaknya dengan 401.
+ * Cakupannya dibatasi oleh pekerjaan: kunci R2 selalu `photo_studio` milik
+ * produk pada pekerjaan itu, tidak pernah jenis atau produk lain.
+ */
+route("POST", `${API_PREFIX}/agent/jobs/:jobId/upload-url`, "agent", async (context) => {
+  const jobId = paramOf(context, "jobId");
+  if (jobId === null) return apiError("NOT_FOUND");
+
+  const job = await d1FindJob(context.env.DB, jobId);
+  if (job === null) return apiError("NOT_FOUND");
+
+  const body = await readJson(context.request);
+  const parsed = UploadUrlRequestSchema.safeParse(
+    typeof body === "object" && body !== null ? { ...body, kind: "photo_studio" } : body,
+  );
+  const validated = parsed.success ? validateUploadRequest(parsed.data) : null;
+  if (validated === null || !validated.ok) {
+    return apiError(validated === null ? "UNSUPPORTED_FORMAT" : validated.code);
+  }
+
+  const mediaId = ulid();
+  const key = buildMediaKey({
+    productId: job.productId,
+    mediaId,
+    kind: "photo_studio",
+    mimeType: validated.mimeType,
+  });
+  if (!key.ok) return apiError(key.code);
+
+  await d1InsertMediaAsset(
+    context.env.DB,
+    {
+      id: mediaId,
+      productId: job.productId,
+      kind: "photo_studio",
+      r2Key: key.key,
+      mimeType: validated.mimeType,
+      bytes: validated.bytes,
+    },
+    context.nowMs,
+  );
+
+  const upload = await createSignedUpload(
+    { r2Key: key.key, mimeType: validated.mimeType, nowMs: context.nowMs },
+    context.url.origin,
+    signingKeyOf(context.env),
+  );
+
+  return apiOk({ mediaId, uploadUrl: upload.uploadUrl, expiresAt: upload.expiresAt });
+});
+
+/**
+ * Konfirmasi unggahan hasil Studio Agent.
+ *
+ * Cerminan `POST /products/:id/media/:mediaId/confirm` untuk kunci agen:
+ * memeriksa magic bytes objek yang baru diunggah, lalu menandai aset
+ * `confirmed`. Mengembalikan `r2Key` yang dipakai agen pada `/complete`
+ * berikutnya — agen tidak lagi menebak kunci dari pola nama.
+ */
+route("POST", `${API_PREFIX}/agent/jobs/:jobId/confirm-upload`, "agent", async (context) => {
+  const jobId = paramOf(context, "jobId");
+  if (jobId === null) return apiError("NOT_FOUND");
+
+  const job = await d1FindJob(context.env.DB, jobId);
+  if (job === null) return apiError("NOT_FOUND");
+
+  const body = await readJson(context.request);
+  const mediaId =
+    typeof body === "object" && body !== null && typeof (body as { mediaId?: unknown }).mediaId === "string"
+      ? (body as { mediaId: string }).mediaId
+      : null;
+  if (mediaId === null || UlidSchema.safeParse(mediaId).success === false) {
+    return apiError("NOT_FOUND");
+  }
+
+  const asset = await d1FindMediaAsset(context.env.DB, mediaId);
+  if (asset === null || asset.productId !== job.productId || asset.kind !== "photo_studio") {
+    return apiError("NOT_FOUND");
+  }
+
+  const object = await context.env.MEDIA.get(asset.r2Key);
+  if (object === null) return apiError("CONTENT_MISMATCH");
+
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  const verified = verifyImageContent(bytes, asset.mimeType);
+  if (!verified.ok) return apiError(verified.code);
+
+  const confirmed = await d1ConfirmMediaAsset(context.env.DB, mediaId, {
+    mimeType: verified.mimeType,
+    bytes: bytes.length,
+  });
+  if (confirmed === null) return apiError("NOT_FOUND");
+
+  return apiOk({ mediaId: confirmed.id, r2Key: confirmed.r2Key, bytes: confirmed.bytes });
+});
+
 // --- Pendamping (§9) ---
 
 route("POST", `${API_PREFIX}/caregivers/invite`, "session", async (context) => {

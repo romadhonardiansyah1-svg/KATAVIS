@@ -337,6 +337,7 @@ Komponen ini paling rapuh menurut ADR-004, jadi ia mendapat perlakuan tersendiri
 | TC-SA-05 | Dua pekerjaan bersamaan | Diantrikan, bukan dijalankan paralel di satu peramban |
 | TC-SA-06 | Agen dimatikan di tengah pekerjaan | Pekerjaan kembali ke antrian, tidak hilang |
 | TC-SA-07 | Gambar hasil tidak mengubah bentuk produk | Perbandingan perseptual dengan foto asli |
+| TC-SA-08 | Agen mengunggah hasil via rute agen | URL terbit, berkas diterima, konfirmasi mengembalikan `r2Key`; rute sesi tetap 401 untuk kunci agen |
 
 TC-SA-07 menegakkan kriteria penerimaan F2 di PRD: produk tidak boleh berubah bentuk, warna, atau
 tekstur. Model yang mengubah produk berarti berbohong tentang barang yang dijual. Ini kriteria

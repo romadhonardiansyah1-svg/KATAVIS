@@ -184,7 +184,7 @@ ATURAN MUTLAK:
   // dapat kehilangan karakter saat rendering ulang.
   await page.keyboard.insertText(promptText);
 
-  const sendButton = await firstMatch(page, GEMINI_SELECTORS.sendButton, 3_000);
+  const sendButton = await firstMatch(page, GEMINI_SELECTORS.sendButton, 8_000);
   if (sendButton === null) {
     throw new AgentRuntimeError("Tombol kirim Gemini tidak ditemukan.", "selector_not_found");
   }
@@ -283,6 +283,7 @@ async function waitForImage(job, context) {
     Math.max(15_000, remainingMs(job.deadlineAt, Date.now())),
   );
   const until = Date.now() + budget;
+  let rounds = 0;
 
   while (Date.now() < until) {
     const refusal = await firstMatch(page, GEMINI_SELECTORS.refusalNotice, 300);
@@ -298,7 +299,13 @@ async function waitForImage(job, context) {
       );
     }
 
-    await assertSessionAlive(page);
+    // Pemeriksaan sesi (probe ~2 detik) tidak perlu setiap putaran 500 ms;
+    // setiap putaran keempat cukup untuk mendeteksi sesi yang mati tanpa
+    // memperlambat deteksi gambar hasil.
+    rounds += 1;
+    if (rounds % 4 === 1) {
+      await assertSessionAlive(page);
+    }
 
     const found = await newestImage(page, context.imageCountBefore);
     if (found !== null) {
@@ -503,7 +510,12 @@ async function fetchViaPage(source, page) {
  * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
  */
 async function screenshotImage(found, page, log) {
-  const target = page.locator(found.selector).nth(found.index);
+  const all = page.locator(found.selector);
+  const count = await all.count().catch(() => 0);
+  // DOM dapat berubah antara deteksi dan unduhan; bila indeks yang
+  // ditangkap sudah di luar jangkauan, pakai gambar terbaru yang ada.
+  const target = count > found.index ? all.nth(found.index) : all.nth(count - 1);
+  if (count === 0) return null;
   await target.scrollIntoViewIfNeeded().catch(() => undefined);
   const buffer = await target.screenshot({ timeout: 10_000 }).catch(() => null);
   if (buffer === null || buffer.byteLength < 1024) return null;
@@ -547,24 +559,16 @@ function mimeFromBytes(bytes) {
 }
 
 /**
- * Ekstensi berkas dari MIME. Dipakai untuk membentuk kunci R2.
- *
- * @param {string} mimeType
- * @returns {string}
- */
-function extensionFor(mimeType) {
-  if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/webp") return "webp";
-  return "png";
-}
-
-/**
  * Mengunggah hasil dan menandai pekerjaan selesai.
  *
- * Urutannya mengikuti kontrak API bagian 5 dan 8 persis, dan urutan itu
+ * Urutannya mengikuti kontrak API bagian 8 persis, dan urutan itu
  * penting: mengunggah lebih dulu, melaporkan selesai kemudian. Melaporkan
  * selesai sebelum berkasnya ada di penyimpanan akan menghasilkan pekerjaan
  * berstatus sukses dengan gambar yang tidak dapat dibuka.
+ *
+ * Rute yang dipakai adalah rute AGEN (`/agent/jobs/:jobId/...`), bukan rute
+ * sesi: agen hanya memegang `X-Agent-Key`, dan rute sesi selalu menolaknya
+ * dengan 401.
  *
  * @param {import("./worker.js").AgentJob} job
  * @param {{ bytes: Uint8Array, mimeType: string }} outcome
@@ -575,8 +579,7 @@ export async function reportSuccess(job, outcome, dependencies) {
   const { client, log } = dependencies;
   const startedAt = Date.now();
 
-  const uploadPlan = await client.post(`/products/${job.productId}/media/upload-url`, {
-    kind: "photo_studio",
+  const uploadPlan = await client.post(`/agent/jobs/${job.id}/upload-url`, {
     mimeType: outcome.mimeType,
     bytes: outcome.bytes.byteLength,
   });
@@ -590,14 +593,19 @@ export async function reportSuccess(job, outcome, dependencies) {
     );
   }
 
-  // Kontrak API bagian 5: `PUT` biner langsung ke uploadUrl, lalu
-  // `POST .../confirm`. Langkah konfirmasi memeriksa magic bytes; berkas
-  // yang isinya bukan gambar ditolak di sana dengan CONTENT_MISMATCH.
+  // Kontrak API bagian 8: `PUT` biner langsung ke uploadUrl, lalu
+  // `POST .../confirm-upload`. Langkah konfirmasi memeriksa magic bytes;
+  // berkas yang isinya bukan gambar ditolak di sana dengan CONTENT_MISMATCH.
   await client.putBinary(uploadUrl, outcome.bytes, outcome.mimeType);
 
-  await client.post(`/products/${job.productId}/media/${mediaId}/confirm`, {});
-
-  const r2Key = buildStudioKey(job.productId, job.id, outcome.mimeType);
+  const confirmed = await client.post(`/agent/jobs/${job.id}/confirm-upload`, { mediaId });
+  const r2Key = confirmed.r2Key;
+  if (typeof r2Key !== "string" || r2Key.length === 0) {
+    throw new AgentRuntimeError(
+      "Server tidak mengembalikan kunci hasil yang lengkap.",
+      "unknown",
+    );
+  }
 
   await client.post(`/agent/jobs/${job.id}/complete`, {
     r2Key,
@@ -606,23 +614,6 @@ export async function reportSuccess(job, outcome, dependencies) {
 
   log(`Pekerjaan ${job.id} selesai. Hasil diunggah sebagai aset baru.`);
   return r2Key;
-}
-
-/**
- * Kunci objek hasil studio.
- *
- * Dibentuk di sisi agen karena `POST /agent/jobs/:jobId/complete` menerima
- * `r2Key` sementara `upload-url` hanya mengembalikan `mediaId`. Nilai ini
- * hanya dipakai untuk melaporkan; yang menentukan letak berkas sebenarnya
- * adalah tanda tangan pada `uploadUrl`.
- *
- * @param {string} productId
- * @param {string} jobId
- * @param {string} mimeType
- * @returns {string}
- */
-function buildStudioKey(productId, jobId, mimeType) {
-  return `products/${productId}/studio-${jobId}.${extensionFor(mimeType)}`;
 }
 
 /**

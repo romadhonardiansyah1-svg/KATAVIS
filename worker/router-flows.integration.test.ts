@@ -55,6 +55,8 @@ const CONTRACT_ENDPOINTS: readonly (readonly [string, string])[] = [
   ["POST", "/api/v1/agent/jobs/claim"],
   ["POST", "/api/v1/agent/jobs/:jobId/complete"],
   ["POST", "/api/v1/agent/jobs/:jobId/fail"],
+  ["POST", "/api/v1/agent/jobs/:jobId/upload-url"],
+  ["POST", "/api/v1/agent/jobs/:jobId/confirm-upload"],
   ["GET", "/api/v1/agent/jobs/:jobId/source-image"],
   ["POST", "/api/v1/caregivers/invite"],
   ["POST", "/api/v1/caregivers/accept"],
@@ -450,6 +452,127 @@ describe("router — antrian Studio Agent", () => {
     expect(row?.provider).toBe("workers_ai");
     expect(row?.error_code).toBe("IMAGE_GENERATE_FAILED");
 
+  });
+});
+
+describe("router — unggahan hasil Studio Agent", () => {
+  const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  async function runningImageJob(productId: string, jobId: string): Promise<string> {
+    await env.DB.prepare(
+      `INSERT INTO jobs (id, product_id, kind, status, attempt, progress, created_at)
+       VALUES (?, ?, 'image', 'running', 1, 0, ?)`,
+    )
+      .bind(jobId, productId, NOW_MS)
+      .run();
+    return jobId;
+  }
+
+  function agentHeaders(agentKey: string): Record<string, string> {
+    return { "X-Agent-Key": agentKey, "Content-Type": "application/json" };
+  }
+
+  it("menerbitkan URL, menerima berkas, lalu mengonfirmasi hasilnya", async () => {
+    // TC-SA-08. Sebelum rute ini ada, agen memakai rute sesi dan selalu
+    // ditolak 401 — keberhasilan Gemini tidak pernah tercatat.
+    const agentKey = env.AGENT_SHARED_KEY ?? "";
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    const jobId = await runningImageJob(productId, "01J8ZQFX9K7YWVTN3MABCDJ910");
+
+    const requested = await call(`/api/v1/agent/jobs/${jobId}/upload-url`, {
+      method: "POST",
+      headers: agentHeaders(agentKey),
+      body: JSON.stringify({ mimeType: "image/png", bytes: PNG_BYTES.length }),
+    });
+    expect(requested.status).toBe(200);
+    const ticket = (await json(requested)) as { data: { mediaId: string; uploadUrl: string } };
+
+    await call(ticket.data.uploadUrl.replace("https://api.example", ""), {
+      method: "PUT",
+      body: PNG_BYTES,
+      headers: { "Content-Length": String(PNG_BYTES.length) },
+    });
+
+    const confirmed = await call(`/api/v1/agent/jobs/${jobId}/confirm-upload`, {
+      method: "POST",
+      headers: agentHeaders(agentKey),
+      body: JSON.stringify({ mediaId: ticket.data.mediaId }),
+    });
+    const confirmedBody = (await json(confirmed)) as { data: { mediaId: string; r2Key: string } };
+
+    expect(confirmed.status).toBe(200);
+    expect(confirmedBody.data.mediaId).toBe(ticket.data.mediaId);
+    // Kunci hasil selalu berawalan studio-, tidak pernah menimpa foto asli.
+    expect(confirmedBody.data.r2Key).toContain("/studio-");
+  });
+
+  it("menolak tanpa kunci agen", async () => {
+    const response = await call(
+      "/api/v1/agent/jobs/01J8ZQFX9K7YWVTN3MABCDJ910/upload-url",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mimeType: "image/png", bytes: 8 }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("menolak pekerjaan yang tidak ada", async () => {
+    const agentKey = env.AGENT_SHARED_KEY ?? "";
+    const response = await call(
+      "/api/v1/agent/jobs/01J00000000000000000000000/upload-url",
+      {
+        method: "POST",
+        headers: agentHeaders(agentKey),
+        body: JSON.stringify({ mimeType: "image/png", bytes: 8 }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("menolak konfirmasi aset milik produk lain", async () => {
+    // TC-SEC-10 untuk jalur agen: mediaId produk A tidak dapat dipakai
+    // menyelesaikan pekerjaan produk B.
+    const agentKey = env.AGENT_SHARED_KEY ?? "";
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    const jobId = await runningImageJob(productId, "01J8ZQFX9K7YWVTN3MABCDJ912");
+    const otherProductId = await createProduct(token);
+
+    const requested = await call(`/api/v1/agent/jobs/${jobId}/upload-url`, {
+      method: "POST",
+      headers: agentHeaders(agentKey),
+      body: JSON.stringify({ mimeType: "image/png", bytes: PNG_BYTES.length }),
+    });
+    const ticket = (await json(requested)) as { data: { mediaId: string; uploadUrl: string } };
+
+    await call(ticket.data.uploadUrl.replace("https://api.example", ""), {
+      method: "PUT",
+      body: PNG_BYTES,
+      headers: { "Content-Length": String(PNG_BYTES.length) },
+    });
+
+    // Asetnya milik produk pertama; pekerjaan palsu untuk produk kedua
+    // dibuat langsung di basis data untuk menguji batasnya.
+    const otherJobId = "01J8ZQFX9K7YWVTN3MABCDJ911";
+    await env.DB.prepare(
+      `INSERT INTO jobs (id, product_id, kind, status, attempt, progress, created_at)
+       VALUES (?, ?, 'image', 'running', 1, 0, ?)`,
+    )
+      .bind(otherJobId, otherProductId, NOW_MS)
+      .run();
+
+    const confirmed = await call(`/api/v1/agent/jobs/${otherJobId}/confirm-upload`, {
+      method: "POST",
+      headers: agentHeaders(agentKey),
+      body: JSON.stringify({ mediaId: ticket.data.mediaId }),
+    });
+
+    expect(confirmed.status).toBe(404);
   });
 });
 

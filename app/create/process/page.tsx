@@ -240,6 +240,9 @@ export default function ProcessPage(): React.JSX.Element {
               onClick: retryGeneration,
               busy: isRetrying,
               busyLabel: "Meminta ulang...",
+              // Menekan Coba lagi selagi tahap lain masih berjalan hanya
+              // menumpuk pekerjaan baru di atas yang lama.
+              disabled: stillRunning,
             }
           : {
               label: "Lanjut periksa hasil",
