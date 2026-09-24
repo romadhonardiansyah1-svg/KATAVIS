@@ -394,6 +394,7 @@ export interface JobView {
   readonly kind: string;
   readonly status: string;
   readonly provider: string | null;
+  readonly locale: string | null;
   readonly progress: number;
   readonly attempt: number;
   /** Bentuk galat yang sama seperti bagian 1, hanya pada pekerjaan gagal. */

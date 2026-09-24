@@ -80,6 +80,34 @@ export async function d1ListJobs(
 }
 
 /**
+ * Pekerjaan terbaru per jenis dan bahasa.
+ *
+ * Setiap percobaan ulang ("Coba lagi") menulis baris pekerjaan BARU, bukan
+ * menimpa yang lama — riwayat itu berguna untuk diagnosis, tetapi layar
+ * proses hanya boleh menampilkan status terkini. Tanpa penyaringan ini,
+ * satu produk yang dicoba 14 kali menampilkan 42 baris dan angka
+ * "Tahap 3 dari 42" yang tidak berarti apa-apa bagi pengrajin.
+ *
+ * Masukan sudah terurut terbaru-lebih-dulu (lihat `d1ListJobs`), jadi
+ * kemunculan pertama per kunci adalah yang terbaru.
+ */
+export function latestJobs(
+  jobs: readonly JobRecord[],
+): readonly JobRecord[] {
+  const seen = new Set<string>();
+  const latest: JobRecord[] = [];
+
+  for (const job of jobs) {
+    const key = `${job.kind}:${job.locale ?? "-"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    latest.push(job);
+  }
+
+  return latest;
+}
+
+/**
  * Kemajuan keseluruhan satu produk.
  *
  * Rata-rata sederhana dari kemajuan setiap pekerjaan. Pekerjaan yang gagal

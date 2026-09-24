@@ -22,7 +22,7 @@ import { ulid } from "ulid";
 
 import { constantTimeEqual } from "../lib/crypto";
 
-import { apiError, apiOk } from "../lib/errors";
+import { ERROR_CATALOG, apiError, apiOk } from "../lib/errors";
 import {
   A11yProfileSchema,
   AgentClaimSchema,
@@ -109,6 +109,7 @@ import {
   d1RetryJob,
   d1ReturnJobToQueue,
   d1UpsertHeartbeat,
+  latestJobs,
   overallProgress,
   parseJobMessage,
   processJob,
@@ -1026,7 +1027,7 @@ route("GET", `${API_PREFIX}/products/:id/jobs`, "session", async (context) => {
   const access = await loadProductFor(context, productId, canViewProduct);
   if (!access.ok) return access.response;
 
-  const jobs = await d1ListJobs(context.env.DB, productId);
+  const jobs = latestJobs(await d1ListJobs(context.env.DB, productId));
 
   return apiOk({
     jobs: jobs.map((job) => ({
@@ -1034,10 +1035,19 @@ route("GET", `${API_PREFIX}/products/:id/jobs`, "session", async (context) => {
       kind: job.kind,
       status: job.status,
       provider: job.provider,
+      locale: job.locale,
       progress: job.progress,
       attempt: job.attempt,
       startedAt: job.startedAt,
       completedAt: job.completedAt,
+      error:
+        job.errorCode !== null && Object.hasOwn(ERROR_CATALOG, job.errorCode)
+          ? {
+              code: job.errorCode,
+              message: ERROR_CATALOG[job.errorCode as keyof typeof ERROR_CATALOG].message,
+              action: ERROR_CATALOG[job.errorCode as keyof typeof ERROR_CATALOG].action,
+            }
+          : null,
     })),
     overallProgress: overallProgress(jobs),
   });

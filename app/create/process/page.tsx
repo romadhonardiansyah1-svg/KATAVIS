@@ -19,7 +19,7 @@ import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
 import { StepLoading, StepShell, type StepError } from "../StepShell";
 import { getJobs, requestGeneration, type JobView } from "../api";
 import styles from "../flow.module.css";
-import { CheckIcon, ClockIcon, DocumentIcon, WarningIcon } from "../icons";
+import { CheckIcon, ClockIcon, DocumentIcon, RefreshIcon, WarningIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
 import { useCreateFlow } from "../useDraft";
 
@@ -40,7 +40,18 @@ const STAGE_LABEL: Readonly<Record<string, string>> = {
   export: "Menyiapkan berkas",
 };
 
-const TERMINAL = ["succeeded", "failed", "cancelled"];
+function stageLabel(job: JobView): string {
+  const base = STAGE_LABEL[job.kind] ?? job.kind;
+  if (job.kind === "copy" && job.locale !== null) {
+    return `${base} (${job.locale === "id" ? "Indonesia" : job.locale.toUpperCase()})`;
+  }
+  return base;
+}
+
+/** Kunci tampilan: satu baris per jenis dan bahasa. */
+function stageKey(job: JobView): string {
+  return `${job.kind}:${job.locale ?? "-"}`;
+}
 
 function messageOf(code: ErrorCode): StepError {
   const entry = ERROR_CATALOG[code];
@@ -52,6 +63,7 @@ export default function ProcessPage(): React.JSX.Element {
   const [jobs, setJobs] = useState<readonly JobView[]>([]);
   const [overall, setOverall] = useState(0);
   const [error, setError] = useState<StepError | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const announcedRef = useRef("");
   const startedRef = useRef(false);
@@ -68,6 +80,18 @@ export default function ProcessPage(): React.JSX.Element {
       const token = readAccessToken();
       if (token === null) {
         if (!cancelled) setError(messageOf("UNAUTHENTICATED"));
+        return;
+      }
+
+      // Jangan menumpuk pekerjaan baru bila masih ada yang berjalan:
+      // setiap kunjungan ulang halaman sebelumnya selalu membuat 3 baris
+      // baru, dan itulah sumber angka "Tahap 3 dari 42".
+      const existing = await getJobs(token, productId);
+      if (cancelled) return;
+      if (
+        existing.ok &&
+        existing.data.jobs.some((job) => job.status === "queued" || job.status === "running")
+      ) {
         return;
       }
 
@@ -107,18 +131,51 @@ export default function ProcessPage(): React.JSX.Element {
     };
   }, [productId]);
 
+  const retryGeneration = async (): Promise<void> => {
+    if (productId === null) return;
+    const token = readAccessToken();
+    if (token === null) {
+      setError(messageOf("UNAUTHENTICATED"));
+      return;
+    }
+
+    setError(null);
+    setIsRetrying(true);
+    const requested = await requestGeneration(token, productId, {
+      tasks: ["copy", "image"],
+      locales: ["id", "en"],
+    });
+    setIsRetrying(false);
+
+    if (!requested.ok) {
+      setError({ message: requested.error.message, action: requested.error.action });
+    }
+  };
+
+  // Server sudah mengembalikan pekerjaan terbaru per jenis dan bahasa.
+  // Pengelompokan di sini hanya pengaman bila respons berisi riwayat lama.
+  const displayedJobs = Object.values(
+    jobs.reduce<Record<string, JobView>>((acc, job) => {
+      acc[stageKey(job)] = job;
+      return acc;
+    }, {}),
+  );
+
   // Yang diumumkan adalah perpindahan tahap, bukan angka kemajuannya.
   // Persentase berubah setiap dua detik; wilayah live yang mengumumkan
   // setiap perubahan akan berbicara tanpa henti selama satu menit penuh,
   // dan justru menenggelamkan hal yang penting: tahap mana yang selesai.
   useEffect(() => {
-    if (jobs.length === 0) return;
+    if (displayedJobs.length === 0) return;
 
-    const done = jobs.filter((job) => job.status === "succeeded").length;
+    const done = displayedJobs.filter((job) => job.status === "succeeded").length;
+    const failedCount = displayedJobs.filter((job) => job.status === "failed").length;
     const message =
-      done === jobs.length
-        ? `Katalog Anda sudah selesai dibuat. ${jobs.length} tahap selesai.`
-        : `Tahap ${done + 1} dari ${jobs.length} sedang berjalan.`;
+      failedCount > 0
+        ? `Satu tahap gagal dan perlu dicoba lagi. ${done} dari ${displayedJobs.length} tahap selesai.`
+        : done === displayedJobs.length
+          ? `Katalog Anda sudah selesai dibuat. ${displayedJobs.length} tahap selesai.`
+          : `Tahap ${done + 1} dari ${displayedJobs.length} sedang berjalan.`;
 
     if (message !== announcedRef.current) {
       announcedRef.current = message;
@@ -128,18 +185,14 @@ export default function ProcessPage(): React.JSX.Element {
 
   if (draft === null) return <StepLoading />;
 
-  // Tampilkan hanya pekerjaan terbaru per jenis agar riwayat percobaan
-  // sebelumnya tidak menumpuk di layar.
-  const latestJobs = Object.values(
-    jobs.reduce<Record<string, JobView>>((acc, job) => {
-      acc[job.kind] = job;
-      return acc;
-    }, {}),
-  );
-
-  const failed = latestJobs.find((job) => job.status === "failed");
+  const failed = displayedJobs.find((job) => job.status === "failed");
   const failure = failed?.error ?? null;
-  const finished = latestJobs.length > 0 && latestJobs.every((job) => TERMINAL.includes(job.status));
+  const allSucceeded =
+    displayedJobs.length > 0 && displayedJobs.every((job) => job.status === "succeeded");
+  const anyFailed = displayedJobs.some((job) => job.status === "failed");
+  const stillRunning = displayedJobs.some(
+    (job) => job.status === "queued" || job.status === "running",
+  );
 
   return (
     <StepShell
@@ -149,23 +202,35 @@ export default function ProcessPage(): React.JSX.Element {
       error={
         failure === null ? error : { message: failure.message, action: failure.action }
       }
-      primary={{
-        label: "Lanjut periksa hasil",
-        icon: <DocumentIcon />,
-        onClick: async () => {
-          update({ generatedAt: Date.now() });
-          await goTo("review");
-        },
-        // Selama belum selesai, tidak ada aksi utama — dan tidak ada aksi
-        // lain yang menggantikannya.
-        disabled: !finished,
-      }}
+      primary={
+        anyFailed
+          ? {
+              label: "Coba lagi",
+              icon: <RefreshIcon />,
+              onClick: retryGeneration,
+              busy: isRetrying,
+              busyLabel: "Meminta ulang...",
+            }
+          : {
+              label: "Lanjut periksa hasil",
+              icon: <DocumentIcon />,
+              onClick: async () => {
+                update({ generatedAt: Date.now() });
+                await goTo("review");
+              },
+              // Lanjut hanya bila SEMUA tahap berhasil. Gagal berarti ada
+              // yang harus dicoba lagi, bukan dilewati diam-diam.
+              disabled: !allSucceeded,
+            }
+      }
     >
       <p className={styles.progressLabel}>
         <ClockIcon size={20} />
-        {finished
+        {allSucceeded
           ? "Katalog Anda sudah selesai dibuat."
-          : `Membuat katalog... ${overall}%`}
+          : anyFailed && !stillRunning
+            ? "Satu tahap gagal. Tekan Coba lagi."
+            : `Membuat katalog... ${overall}%`}
       </p>
 
       {/* Hanya perubahan tahap yang diumumkan. `polite`, bukan `assertive`:
@@ -187,7 +252,7 @@ export default function ProcessPage(): React.JSX.Element {
       </div>
 
       <ul className={styles.stageList}>
-        {latestJobs.map((job) => (
+        {displayedJobs.map((job) => (
           <li key={job.id} className={styles.statusRow}>
             <span
               className={
@@ -206,7 +271,7 @@ export default function ProcessPage(): React.JSX.Element {
                 <ClockIcon size={20} />
               )}
             </span>
-            {STAGE_LABEL[job.kind] ?? job.kind}
+            {stageLabel(job)}
             {job.status === "running" ? ` — ${job.progress}%` : ""}
             {job.status === "succeeded" ? " — selesai" : ""}
             {job.status === "failed" ? " — gagal" : ""}
@@ -216,7 +281,7 @@ export default function ProcessPage(): React.JSX.Element {
 
       {failure === null ? null : (
         <p className={styles.hint}>
-          Anda tetap dapat melanjutkan. Pekerjaan Anda tidak hilang.
+          Tekan Coba lagi untuk mengulang tahap yang gagal. Pekerjaan Anda tidak hilang.
         </p>
       )}
     </StepShell>

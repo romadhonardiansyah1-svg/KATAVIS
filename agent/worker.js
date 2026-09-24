@@ -126,14 +126,18 @@ export async function generateInGemini(job, dependencies) {
 
   const promptText =
     tempFile !== null
-      ? `Dari foto produk yang saya lampirkan, buatkan versi foto komersial studio profesional:
+      ? `Edit foto produk yang saya lampirkan menjadi foto katalog komersial studio yang menarik dan estetik.
 
-- PERTAHANKAN produk asli 100% persis seperti di foto (bentuk, warna, tekstur, bahan, ukuran, detail). Jangan ubah sedikitpun.
-- GANTI hanya latar belakangnya: letakkan produk di atas meja marmer putih bersih dengan pencahayaan studio softbox profesional dari kiri atas.
-- Tambahkan bayangan kontak halus dan natural di bawah produk.
-- Latar belakang gradient abu-abu muda ke putih, bersih tanpa gangguan.
-- Kualitas foto setara katalog pameran seni kriya internasional, tajam, resolusi tinggi.
-- Jangan tambahkan objek lain, teks, atau watermark.`
+ATURAN MUTLAK:
+- Produk utama adalah SATU-SATUNYA objek di foto hasil. Hapus semua objek lain, tangan, kemasan berlebih, atau gangguan di sekitar produk.
+- Pertahankan produk 100% persis seperti di foto lampiran: bentuk, warna, tekstur bahan, ukuran relatif, dan seluruh detailnya. Jangan menggambar ulang produk menjadi barang lain.
+
+HASIL YANG DIMINTA:
+- Produk diletakkan di atas meja marmer putih bersih, difoto dari sudut tiga-perempat yang menonjolkan bentuknya.
+- Pencahayaan studio softbox profesional dari kiri atas, bayangan kontak yang halus dan natural di bawah produk.
+- Latar belakang gradient abu-abu muda ke putih yang bersih, dengan sedikit kesan ruang (depth) agar tidak terlihat polos dan datar.
+- Gaya fotografi katalog pameran seni kriya internasional: tajam, hidup, dan menjual.
+- Tanpa teks, tanpa watermark, tanpa objek tambahan.`
       : job.prompt.trim().length > 0
         ? job.prompt
         : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
@@ -148,6 +152,12 @@ export async function generateInGemini(job, dependencies) {
   const imageCountBefore = await countImages(page);
 
   await promptInput.click();
+  // Kosongkan dulu kotak masukan: memastikan prompt dikirim tepat SATU kali.
+  // Tanpa ini, sisa teks dari percobaan sebelumnya dapat ikut terkirim
+  // bersama prompt baru bila navigasi chat baru belum selesai me-render.
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.waitForTimeout(300);
   // `insertText`, bukan penekanan tombol satu per satu: prompt memuat
   // karakter non-ASCII, dan menekan tombol demi tombol pada aplikasi Angular
   // dapat kehilangan karakter saat rendering ulang.
@@ -269,11 +279,14 @@ async function waitForImage(job, context) {
 
     await assertSessionAlive(page);
 
-    const locator = await newestImage(page, context.imageCountBefore);
-    if (locator !== null) {
-      log("Gambar hasil terdeteksi. Mengunduh.");
-      const outcome = await downloadImage(locator, context);
-      if (outcome !== null) return outcome;
+    const found = await newestImage(page, context.imageCountBefore);
+    if (found !== null) {
+      log(`Gambar hasil terdeteksi (${found.width}x${found.height}). Mengunduh.`);
+      const outcome = await downloadImage(found, context);
+      if (outcome !== null) {
+        log(`Gambar hasil terunduh: ${outcome.bytes.byteLength} bita (${outcome.mimeType}).`);
+        return outcome;
+      }
 
       throw new AgentRuntimeError("Gambar hasil tidak dapat diunduh.", "selector_not_found");
     }
@@ -285,16 +298,44 @@ async function waitForImage(job, context) {
 }
 
 /**
+ * Gambar hasil terbaru beserta alamatnya, ditangkap atomis.
+ *
+ * Alamat (`src`) dibaca PADA SAAT gambar terdeteksi, bukan saat mengunduh:
+ * DOM Gemini me-render ulang respons yang sedang streaming, sehingga locator
+ * yang dibaca belakangan dapat menunjuk elemen yang sudah dilepas — dan
+ * itulah yang membuat unduhan gagal tepat setelah deteksi berhasil.
+ *
+ * Hanya elemen `generated-image` yang dihitung. Pratinjau lampiran foto
+ * input (`preview-image-button`) BUKAN hasil dan tidak pernah dihitung.
+ *
  * @param {import("@playwright/test").Page} page
  * @param {number} countBefore
- * @returns {Promise<import("@playwright/test").Locator | null>}
+ * @returns {Promise<{ src: string, width: number, height: number } | null>}
  */
 async function newestImage(page, countBefore) {
   for (const selector of GEMINI_SELECTORS.generatedImage) {
     try {
       const locator = page.locator(selector);
       const count = await locator.count();
-      if (count > countBefore) return locator.nth(count - 1);
+      if (count <= countBefore) continue;
+
+      const last = locator.nth(count - 1);
+      const src = await last.getAttribute("src").catch(() => null);
+      if (src === null || src.length === 0) continue;
+
+      const size = await last
+        .evaluate((el) => ({
+          width: el.naturalWidth ?? 0,
+          height: el.naturalHeight ?? 0,
+          currentSrc: el.currentSrc ?? "",
+        }))
+        .catch(() => null);
+
+      return {
+        src: size?.currentSrc && size.currentSrc.length > 0 ? size.currentSrc : src,
+        width: size?.width ?? 0,
+        height: size?.height ?? 0,
+      };
     } catch {
       // Alternatif berikutnya.
     }
@@ -318,14 +359,18 @@ async function newestImage(page, countBefore) {
  * menuntut cookie sesi; memintanya dari konteks peramban membawa cookie itu
  * tanpa perlu menyalinnya ke mana pun.
  *
- * @param {import("@playwright/test").Locator} image
+ * Menerima ALAMAT gambar (string), bukan locator: alamat ditangkap pada saat
+ * deteksi, sehingga unduhan tidak bergantung pada elemen DOM yang mungkin
+ * sudah di-render ulang oleh Gemini.
+ *
+ * @param {{ src: string, width: number, height: number }} found
  * @param {JobDependencies & { imageCountBefore: number }} context
  * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
  */
-async function downloadImage(image, context) {
+async function downloadImage(found, context) {
   const { page } = context;
 
-  const inline = await inlineDataUrl(image);
+  const inline = inlineDataUrl(found.src);
   if (inline !== null) return inline;
 
   const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 2_000);
@@ -350,16 +395,15 @@ async function downloadImage(image, context) {
     }
   }
 
-  return fetchViaPage(image, page);
+  return fetchViaPage(found.src, page);
 }
 
 /**
- * @param {import("@playwright/test").Locator} image
- * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
+ * @param {string} source
+ * @returns {{ bytes: Uint8Array, mimeType: string } | null}
  */
-async function inlineDataUrl(image) {
-  const source = await image.getAttribute("src").catch(() => null);
-  if (source === null || !source.startsWith("data:")) return null;
+function inlineDataUrl(source) {
+  if (!source.startsWith("data:")) return null;
 
   const commaAt = source.indexOf(",");
   if (commaAt < 0) return null;
@@ -376,13 +420,12 @@ async function inlineDataUrl(image) {
 }
 
 /**
- * @param {import("@playwright/test").Locator} image
+ * @param {string} source
  * @param {import("@playwright/test").Page} page
  * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
  */
-async function fetchViaPage(image, page) {
-  const source = await image.getAttribute("src").catch(() => null);
-  if (source === null || source.length === 0) return null;
+async function fetchViaPage(source, page) {
+  if (source.length === 0) return null;
 
   const encoded = await page
     .evaluate(async (url) => {

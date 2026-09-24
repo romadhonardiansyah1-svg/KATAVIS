@@ -56,7 +56,7 @@ export {
 
 // Akses D1 pekerjaan. Terpisah dari aturan siklus hidupnya, yang tetap murni
 // dan tidak menyentuh basis data.
-export { d1ListJobs, overallProgress } from "./d1-jobs";
+export { d1ListJobs, latestJobs, overallProgress } from "./d1-jobs";
 
 export type { JobRecord } from "./d1-jobs";
 

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { d1ListJobs, overallProgress, type JobRecord } from "./d1-jobs";
+import { d1ListJobs, latestJobs, overallProgress, type JobRecord } from "./d1-jobs";
 
 interface Recorded {
   readonly sql: string;
@@ -122,6 +122,41 @@ describe("jobs/d1-jobs — d1ListJobs", () => {
 
     expect(jobs[0]?.locale).toBeNull();
     expect(jobs[0]?.kind).toBe("asr");
+  });
+});
+
+describe("jobs/d1-jobs — latestJobs", () => {
+  it("hanya menyimpan pekerjaan terbaru per jenis dan bahasa", () => {
+    // Satu produk yang dicoba 14 kali menumpuk 42 baris; layar proses
+    // hanya boleh menampilkan status terkini per tahap.
+    const rows = [
+      job({ id: "baru-copy-id", kind: "copy", locale: "id", status: "succeeded" }),
+      job({ id: "lama-copy-id", kind: "copy", locale: "id", status: "failed" }),
+      job({ id: "baru-copy-en", kind: "copy", locale: "en", status: "running" }),
+      job({ id: "baru-image", kind: "image", locale: null, status: "queued" }),
+      job({ id: "lama-image", kind: "image", locale: null, status: "failed" }),
+    ];
+
+    const result = latestJobs(rows);
+
+    expect(result.map((entry) => entry.id)).toEqual([
+      "baru-copy-id",
+      "baru-copy-en",
+      "baru-image",
+    ]);
+  });
+
+  it("membedakan copy Indonesia dan Inggris sebagai dua tahap", () => {
+    const rows = [
+      job({ id: "copy-id", kind: "copy", locale: "id" }),
+      job({ id: "copy-en", kind: "copy", locale: "en" }),
+    ];
+
+    expect(latestJobs(rows)).toHaveLength(2);
+  });
+
+  it("mengembalikan larik kosong saat belum ada pekerjaan", () => {
+    expect(latestJobs([])).toEqual([]);
   });
 });
 
