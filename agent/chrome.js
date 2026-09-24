@@ -87,6 +87,18 @@ export const GEMINI_SELECTORS = {
     'button[aria-label*="Unduh" i]',
     'button[data-test-id="download-button"]',
   ],
+  /**
+   * Kolom unggah KHUSUS gambar.
+   *
+   * Diverifikasi 24 Sep 2026 terhadap DOM live: menu unggah memasang TIGA
+   * `input[type="file"]`, dan `.first()` menunjuk input dokumen
+   * (accept .txt/.pdf/...) — BUKAN gambar. Memakai input dokumen membuat
+   * `setInputFiles` berhasil tanpa galat tetapi foto tidak pernah menempel.
+   * Selector ini menunjuk input ber-`accept` gambar, satu-satunya yang benar.
+   * Inputnya tersembunyi (`visible=False`) dan hanya ada setelah menu unggah
+   * dibuka; Playwright tetap dapat mengisinya.
+   */
+  imageFileInput: ['input[accept*="image"]'],
   /** Gambar yang dihasilkan. */
   generatedImage: [
     "generated-image img",

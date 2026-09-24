@@ -112,37 +112,23 @@ export async function generateInGemini(job, dependencies) {
         .catch(() => 0);
       log("Melampirkan foto asli produk ke Gemini web...");
 
-      // Jalur utama: tangkap dialog berkas dari tombol unggah. Ini menjamin
-      // berkas masuk ke input yang benar — menebak di antara beberapa
-      // `input[type="file"]` tersembunyi sering salah sasaran.
+      // Buka menu unggah agar kolom berkas terpasang di DOM, lalu isi
+      // input KHUSUS gambar (accept gambar). Input dokumen (.first())
+      // menerima berkas tanpa galat tetapi foto tidak pernah menempel.
       const uploadBtn = page
         .locator('button[aria-label*="Upload" i], button[aria-label*="Unggah" i]')
         .first();
       if ((await uploadBtn.count()) > 0) {
-        try {
-          const [chooser] = await Promise.all([
-            page.waitForEvent("filechooser", { timeout: 5_000 }),
-            uploadBtn.click(),
-          ]);
-          await chooser.setFiles(tempFile);
-        } catch {
-          // Tombol tidak membuka dialog (misal menu yang harus dipilih
-          // dulu). Jatuh ke jalur input langsung di bawah.
-        }
+        await uploadBtn.click().catch(() => undefined);
       }
-
-      // Jalur cadangan: isi input berkas langsung.
-      let fileInput = page.locator('input[type="file"]').first();
-      if ((await fileInput.count()) === 0) {
-        const moreBtn = page.locator('button[aria-label*="tambah" i]').first();
-        if ((await moreBtn.count()) > 0) {
-          await moreBtn.click();
-          await page.waitForTimeout(600);
-        }
-        fileInput = page.locator('input[type="file"]').first();
-      }
-      if ((await fileInput.count()) > 0) {
-        await fileInput.setInputFiles(tempFile).catch(() => undefined);
+      const imageInput = page
+        .locator(GEMINI_SELECTORS.imageFileInput[0] ?? 'input[accept*="image"]')
+        .first();
+      try {
+        await imageInput.waitFor({ state: "attached", timeout: 5_000 });
+        await imageInput.setInputFiles(tempFile);
+      } catch {
+        // Kolom tidak muncul; verifikasi pratinjau di bawah yang menentukan.
       }
 
       await page.waitForTimeout(2500);
