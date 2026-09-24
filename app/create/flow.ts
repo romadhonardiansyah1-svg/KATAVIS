@@ -95,6 +95,10 @@ export interface Draft {
   readonly contentReviewedAt: number | null;
   readonly publishedAt: number | null;
   readonly slug: string | null;
+  /** Gaya latar studio pilihan pengrajin di Langkah 1. */
+  readonly imageStyle: string | null;
+  /** Keinginan gaya foto tulisan pengrajin, dipertajam AI saat proses. */
+  readonly imagePromptManual: string | null;
   readonly updatedAt: number;
 }
 
@@ -108,6 +112,8 @@ export const EMPTY_DRAFT: Draft = {
   contentReviewedAt: null,
   publishedAt: null,
   slug: null,
+  imageStyle: null,
+  imagePromptManual: null,
   updatedAt: 0,
 };
 

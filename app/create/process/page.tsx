@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
 
 import { StepLoading, StepShell, type StepError } from "../StepShell";
-import { getJobs, requestGeneration, type JobView } from "../api";
+import { getJobs, requestGeneration, sharpenImagePrompt, type JobView } from "../api";
 import styles from "../flow.module.css";
 import { CheckIcon, ClockIcon, DocumentIcon, RefreshIcon, WarningIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
@@ -97,9 +97,26 @@ export default function ProcessPage(): React.JSX.Element {
 
       // Pemrosesan diminta sekali. Mengulanginya pada setiap penyegaran
       // halaman akan menumpuk pekerjaan yang sama.
+      // Bila pengrajin menulis keinginan gaya foto di Langkah 1, AI
+      // mempertajamnya dulu menjadi prompt final; bila tidak ada, server
+      // memakai prompt otomatis dari transkrip.
+      const manual = draft?.imagePromptManual?.trim() ?? "";
+      const style = draft?.imageStyle ?? "marble_light";
+      let imagePrompt: string | undefined;
+      if (manual.length > 0) {
+        const sharpened = await sharpenImagePrompt(token, productId, {
+          style,
+          manual,
+        });
+        if (cancelled) return;
+        if (sharpened.ok) imagePrompt = sharpened.data.prompt;
+      }
+
       const requested = await requestGeneration(token, productId, {
         tasks: ["copy", "image"],
         locales: ["id", "en"],
+        imageStyle: style,
+        ...(imagePrompt === undefined ? {} : { imagePrompt }),
       });
 
       if (!requested.ok && !cancelled) {
@@ -141,9 +158,22 @@ export default function ProcessPage(): React.JSX.Element {
 
     setError(null);
     setIsRetrying(true);
+    const manual = draft?.imagePromptManual?.trim() ?? "";
+    const style = draft?.imageStyle ?? "marble_light";
+    let imagePrompt: string | undefined;
+    if (manual.length > 0) {
+      const sharpened = await sharpenImagePrompt(token, productId, {
+        style,
+        manual,
+      });
+      if (sharpened.ok) imagePrompt = sharpened.data.prompt;
+    }
+
     const requested = await requestGeneration(token, productId, {
       tasks: ["copy", "image"],
       locales: ["id", "en"],
+      imageStyle: style,
+      ...(imagePrompt === undefined ? {} : { imagePrompt }),
     });
     setIsRetrying(false);
 

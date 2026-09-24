@@ -118,23 +118,35 @@ akan menghasilkan katalog yang salah tentang barang nyata, dan pengrajin yang me
 | F2-05 | **Produk tidak berubah bentuk, warna, atau tekstur** | TC-SA-07 |
 | F2-06 | Pengrajin dapat menolak hasil | TC-E2E-01 |
 | F2-07 | Foto asli tidak pernah ditimpa | TC-E2E-13 |
-| F2-08 | Fallback Gemini ke Workers AI dalam 45 detik | TC-E2E-11 |
+| F2-08 | Fallback Gemini ke Workers AI dalam 90 detik | TC-E2E-11 |
 | F2-09 | Kegagalan seluruh penyedia mempertahankan foto asli | TC-E2E-13 |
+| F2-10 | Prompt otomatis memuat isi transkrip produk | TC-U-CAT-09 |
+| F2-11 | Lima gaya latar tersedia dan arahannya berbeda | TC-U-CAT-10 |
+| F2-12 | Keinginan manual dipertajam AI; bila AI gagal dipakai prompt otomatis | TC-U-CAT-11 |
 
 F2-05 adalah kriteria gagal/lolos, bukan preferensi. Diverifikasi dengan perbandingan perseptual
 antara foto asli dan hasil. Ambang kemiripan struktur ditetapkan setelah pengukuran Minggu 1.
 
 ### Prompt generate gambar
 
-```
-Tempatkan produk ini persis seperti aslinya pada {suasana}.
-Pencahayaan studio lembut dari kiri atas, bayangan kontak yang wajar,
-kedalaman bidang dangkal.
-JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk.
-```
+Prompt final disusun per produk, bukan satu template untuk semua:
 
-Kalimat terakhir wajib ada dalam setiap prompt. Ia menegakkan F2-05 di tingkat masukan model,
-bukan hanya di tingkat pemeriksaan keluaran.
+1. **Otomatis** — dari transkrip + gaya pilihan. Dua produk berbeda tidak
+   pernah mendapat prompt yang sama persis.
+2. **Manual + penajaman** — pengrajin menulis keinginan dengan kata sendiri
+   di Langkah 1 ("latar sawah sore hari"); AI mempertajamnya menjadi prompt
+   studio lengkap lewat `POST /products/:id/image-prompt`.
+3. **Agen** — saat foto terlampir di Gemini web, prompt server dipakai
+   sebagai arah kreatif dan agen menambahkan aturan pelestarian produk.
+
+Contoh prompt otomatis (gaya Marmer Terang):
+
+```
+Edit foto produk yang saya lampirkan menjadi foto katalog komersial studio
+yang menarik dan estetik untuk produk: "pakan duckweed dan larva bsf".
+Produk difoto dari sudut tiga-perempat di atas meja marmer putih bersih ...
+Produk utama adalah SATU-SATUNYA objek di foto hasil ...
+```
 
 ---
 

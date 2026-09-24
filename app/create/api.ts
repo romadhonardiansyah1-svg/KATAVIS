@@ -404,9 +404,35 @@ export interface JobView {
 export function requestGeneration(
   token: string,
   productId: string,
-  body: { readonly tasks: readonly string[]; readonly locales: readonly string[] },
+  body: {
+    readonly tasks: readonly string[];
+    readonly locales: readonly string[];
+    readonly imageStyle?: string;
+    readonly imagePrompt?: string;
+  },
 ): Promise<ApiResult<{ readonly jobs: readonly { readonly id: string; readonly kind: string }[] }>> {
   return jsonRequest(`/products/${productId}/generate`, token, "POST", body);
+}
+
+export interface SharpenedPrompt {
+  readonly prompt: string;
+  readonly mode: "auto" | "sharpened";
+  readonly style: string;
+}
+
+/**
+ * Meminta prompt studio final ke server.
+ *
+ * Tanpa `manual`, server mengembalikan prompt otomatis dari transkrip.
+ * Dengan `manual`, AI mempertajam keinginan pengrajin; bila AI gagal,
+ * server tetap mengembalikan prompt otomatis — tidak pernah galat.
+ */
+export function sharpenImagePrompt(
+  token: string,
+  productId: string,
+  body: { readonly style?: string; readonly manual?: string },
+): Promise<ApiResult<SharpenedPrompt>> {
+  return jsonRequest(`/products/${productId}/image-prompt`, token, "POST", body);
 }
 
 export function getJobs(

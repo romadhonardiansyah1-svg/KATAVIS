@@ -56,7 +56,7 @@ const TEXT_TIMEOUT_MS = 20_000;
  */
 const WORKERS_AI_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const WORKERS_AI_ASR_MODEL = "@cf/openai/whisper-large-v3-turbo";
-const WORKERS_AI_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+export const WORKERS_AI_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 // --- Pembantu bersama ---
 
@@ -388,7 +388,16 @@ export function createWorkersAiTranscriptionProvider(options: WorkersAiAsrOption
 export interface NineRouterOptions {
   readonly apiKey: string;
   readonly baseUrl: string;
+  /**
+   * Model teks di proksi 9router. Bawaan yang terbukti bekerja lewat proksi
+   * lokal; diganti lewat `NINEROUTER_TEXT_MODEL` tanpa mengubah kode.
+   * Catatan: `ag/gemini-3.8-flash*` diuji September 2026 dan TIDAK menjawab
+   * lewat proksi ini (404/kosong) — jangan memakainya sebelum diuji ulang.
+   */
+  readonly model?: string | undefined;
 }
+
+export const DEFAULT_NINEROUTER_TEXT_MODEL = "ba/glm-5.3-flash";
 
 /** Bentuk yang diminta dari model teks. Divalidasi ulang oleh pemanggil. */
 interface GeneratedCopy {
@@ -565,7 +574,7 @@ export function createNineRouterTextProvider(options: NineRouterOptions) {
             Authorization: `Bearer ${options.apiKey}`,
           },
           body: JSON.stringify({
-            model: "ba/glm-5.3-flash",
+            model: options.model ?? DEFAULT_NINEROUTER_TEXT_MODEL,
             messages: [{ role: "user", content: buildCopyPrompt(request.transcript, request.locale) }],
             temperature: 0.4,
           }),

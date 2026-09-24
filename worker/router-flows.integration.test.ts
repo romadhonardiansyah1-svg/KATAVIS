@@ -48,12 +48,14 @@ const CONTRACT_ENDPOINTS: readonly (readonly [string, string])[] = [
   ["GET", "/api/v1/products/:id/transcript"],
   ["PUT", "/api/v1/products/:id/transcript"],
   ["POST", "/api/v1/products/:id/generate"],
+  ["POST", "/api/v1/products/:id/image-prompt"],
   ["GET", "/api/v1/products/:id/jobs"],
   ["POST", "/api/v1/products/:id/jobs/:jobId/retry"],
   ["POST", "/api/v1/agent/heartbeat"],
   ["POST", "/api/v1/agent/jobs/claim"],
   ["POST", "/api/v1/agent/jobs/:jobId/complete"],
   ["POST", "/api/v1/agent/jobs/:jobId/fail"],
+  ["GET", "/api/v1/agent/jobs/:jobId/source-image"],
   ["POST", "/api/v1/caregivers/invite"],
   ["POST", "/api/v1/caregivers/accept"],
   ["GET", "/api/v1/caregivers"],
@@ -306,6 +308,66 @@ describe("router — alur media", () => {
     expect((await json(response)) as { error: { code: string } }).toMatchObject({
       error: { code: "UNSUPPORTED_FORMAT" },
     });
+  });
+});
+
+describe("router — prompt studio", () => {
+  it("menyusun prompt otomatis dari transkrip dan gaya", async () => {
+    // F2-10, lewat router.
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+
+    await call(
+      `/api/v1/products/${productId}/transcript`,
+      auth(token, {
+        method: "PUT",
+        body: JSON.stringify({ text: "Tas anyaman pandan dari pengrajin." }),
+      }),
+    );
+
+    const response = await call(
+      `/api/v1/products/${productId}/image-prompt`,
+      auth(token, {
+        method: "POST",
+        body: JSON.stringify({ style: "wood_warm" }),
+      }),
+    );
+    const body = (await json(response)) as {
+      data: { prompt: string; mode: string; style: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.data.mode).toBe("auto");
+    expect(body.data.style).toBe("wood_warm");
+    expect(body.data.prompt).toContain("Tas anyaman pandan");
+    expect(body.data.prompt).toContain("SATU-SATUNYA objek");
+  });
+
+  it("menolak gaya yang tidak dikenal", async () => {
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+
+    const response = await call(
+      `/api/v1/products/${productId}/image-prompt`,
+      auth(token, {
+        method: "POST",
+        body: JSON.stringify({ style: "neon_cyberpunk" }),
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect((await json(response)) as { error: { code: string } }).toMatchObject({
+      error: { code: "CONTENT_INCOMPLETE" },
+    });
+  });
+
+  it("menolak tanpa token", async () => {
+    const response = await call("/api/v1/products/01J00000000000000000000000/image-prompt", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(401);
   });
 });
 

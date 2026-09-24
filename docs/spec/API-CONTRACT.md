@@ -342,15 +342,38 @@ ditandai adalah tindakan meninjau, bukan tindakan menyunting.
 
 ```json
 // Permintaan
-{ "tasks": ["copy", "image"], "locales": ["id", "en"], "imageStyle": "marble_light" }
+{ "tasks": ["copy", "image"], "locales": ["id", "en"], "imageStyle": "marble_light", "imagePrompt": "Letakkan produk di atas..." }
 ```
 
-`imageStyle`: `marble_light` | `wood_warm` | `dark_gradient`
+`imageStyle`: `marble_light` | `wood_warm` | `dark_gradient` | `rattan_natural` | `clay_minimal`
+
+`imagePrompt` (opsional, maks 2000 karakter): prompt studio final, biasanya
+hasil penajaman AI atas keinginan pengrajin. Bila ada, dipakai apa adanya
+untuk pekerjaan gambar. Bila kosong, server menyusun prompt otomatis dari
+transkrip dan gaya — sehingga prompt selalu menyesuaikan produk.
 
 ```json
 // Respons
 { "ok": true, "data": { "jobs": [ { "id": "01J...", "kind": "copy", "status": "queued" },
                                   { "id": "01J...", "kind": "image", "status": "queued" } ] } }
+```
+
+### `POST /products/:id/image-prompt`
+
+Menyusun prompt foto studio final sebelum generate. Tiga mode dalam satu
+endpoint: tanpa `manual`, jawabannya prompt otomatis dari transkrip (mode
+`"auto"`); dengan `manual`, AI mempertajam keinginan pengrajin (mode
+`"sharpened"`).
+
+Endpoint ini tidak pernah gagal dengan galat AI: bila seluruh lapis teks
+gagal, jawabannya adalah prompt otomatis.
+
+```json
+// Permintaan
+{ "style": "wood_warm", "manual": "latar sawah sore hari" }
+
+// Respons
+{ "ok": true, "data": { "prompt": "Edit foto produk yang ...", "mode": "sharpened", "style": "wood_warm" } }
 ```
 
 ### `GET /products/:id/jobs`
@@ -434,6 +457,13 @@ memperlambat siapa pun.
 
 Kegagalan mengembalikan pekerjaan ke antrian dengan penanda `gemini_failed`, lalu consumer
 Workers AI mengambilnya.
+
+### `GET /agent/jobs/:jobId/source-image`
+
+Mengunduh foto asli produk sebagai biner, supaya agen dapat melampirkannya
+ke Gemini web. Tanpa foto terlampir, Gemini mengarang produk lain.
+
+Merupakan `image/jpeg`/`png`/`webp` sesuai yang diunggah pengrajin.
 
 ---
 

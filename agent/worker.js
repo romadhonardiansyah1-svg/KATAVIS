@@ -146,22 +146,21 @@ export async function generateInGemini(job, dependencies) {
     log(`Peringatan lampiran foto: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  const serverPrompt = job.prompt.trim();
+  // Foto terlampir mengubah cara prompt dibaca: prompt server menjadi ARAH
+  // KREATIF (produk apa, gaya apa), sementara aturan pelestarian produk
+  // ditambahkan di sini karena hanya agen yang tahu foto berhasil ditempel.
+  // Tanpa foto, prompt server dipakai apa adanya.
   const promptText =
     tempFile !== null
-      ? `Edit foto produk yang saya lampirkan menjadi foto katalog komersial studio yang menarik dan estetik.
+      ? `Edit foto produk yang saya lampirkan. Arah kreatif: ${serverPrompt.length > 0 ? serverPrompt : "foto katalog studio yang menarik dan estetik"}.
 
 ATURAN MUTLAK:
 - Produk utama adalah SATU-SATUNYA objek di foto hasil. Hapus semua objek lain, tangan, kemasan berlebih, atau gangguan di sekitar produk.
 - Pertahankan produk 100% persis seperti di foto lampiran: bentuk, warna, tekstur bahan, ukuran relatif, dan seluruh detailnya. Jangan menggambar ulang produk menjadi barang lain.
-
-HASIL YANG DIMINTA:
-- Produk diletakkan di atas meja marmer putih bersih, difoto dari sudut tiga-perempat yang menonjolkan bentuknya.
-- Pencahayaan studio softbox profesional dari kiri atas, bayangan kontak yang halus dan natural di bawah produk.
-- Latar belakang gradient abu-abu muda ke putih yang bersih, dengan sedikit kesan ruang (depth) agar tidak terlihat polos dan datar.
-- Gaya fotografi katalog pameran seni kriya internasional: tajam, hidup, dan menjual.
 - Tanpa teks, tanpa watermark, tanpa objek tambahan.`
-      : job.prompt.trim().length > 0
-        ? job.prompt
+      : serverPrompt.length > 0
+        ? serverPrompt
         : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
 
   await assertSessionAlive(page);

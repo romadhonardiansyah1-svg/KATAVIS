@@ -46,6 +46,7 @@ import { loadProductDetail } from "../db";
 import { isContentComplete } from "./content";
 import { requireConsent } from "./consent";
 import { requireReviewedTranscript } from "./transcript";
+import { buildAutoStudioPrompt } from "./studio-prompt";
 
 /**
  * Transisi status yang sah. Hanya maju.
@@ -432,9 +433,7 @@ export interface GenerationRequest {
   readonly tasks: readonly JobKind[];
   readonly locales: readonly Locale[];
   readonly imageStyle?: ImageStyle;
-}
-
-export type GenerationResult =
+}export type GenerationResult =
   | { readonly ok: true; readonly jobs: readonly QueuedJob[] }
   | { readonly ok: false; readonly code: ErrorCode };
 
@@ -495,22 +494,35 @@ export async function requestGeneration(
     query: "SELECT text FROM transcripts WHERE product_id = ? LIMIT 1",
     params: [productId],
   });
-  const productDesc = transcriptRecord?.text
-    ? `produk: "${transcriptRecord.text}"`
-    : "produk kerajinan tangan Nusantara";
+  // Transkrip bisa sepanjang 8000 karakter; prompt hanya butuh intinya.
+  // Batas kontrak API untuk prompt adalah 2000 karakter.
+  const transcriptExcerpt = (transcriptRecord?.text ?? "").trim().slice(0, 300);
+  const productDesc =
+    transcriptExcerpt.length > 0
+      ? `produk: "${transcriptExcerpt}"`
+      : "produk kerajinan tangan Nusantara";
 
   // Semua pekerjaan masuk dalam satu putaran. Membuatnya satu per satu akan
   // menunda pekerjaan pertama sampai yang terakhir selesai ditulis, dan
   // membuat jumlah kueri tumbuh seiring jumlah bahasa.
+  const manualPrompt = parsed.data.imagePrompt?.trim() ?? "";
+  const style = parsed.data.imageStyle ?? "marble_light";
   const statements = planned.map((entry) => {
     const id = ulid();
     jobs.push({ id, kind: entry.kind, status: "queued" });
 
+    // Prompt eksplisit pengrajin (hasil penajaman AI atau tulisan sendiri)
+    // dipakai apa adanya. Server tidak menimpa pilihan eksplisit — bila
+    // kosong, prompt otomatis disusun dari transkrip sehingga berbeda untuk
+    // setiap produk.
     const payload =
       entry.kind === "image"
         ? JSON.stringify({
-            style: parsed.data.imageStyle ?? "studio",
-            prompt: `Buat foto produk studio profesional berkualitas tinggi untuk ${productDesc}. Tampilkan produk ini di atas meja marmer elegan dengan pencahayaan studio lembut. Latar bersih studio komersial. JANGAN mengubah detail produk, pertahankan seluruh tekstur dan bentuk apa adanya.`,
+            style,
+            prompt:
+              manualPrompt.length > 0
+                ? manualPrompt
+                : buildAutoStudioPrompt({ productLabel: productDesc, style }),
           })
         : null;
 

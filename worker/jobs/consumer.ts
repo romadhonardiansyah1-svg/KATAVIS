@@ -60,6 +60,7 @@ export interface ConsumerEnv {
   readonly GROQ_API_KEY?: string | undefined;
   readonly NINEROUTER_API_KEY?: string | undefined;
   readonly NINEROUTER_BASE_URL?: string | undefined;
+  readonly NINEROUTER_TEXT_MODEL?: string | undefined;
 }
 
 /** Bentuk pesan antrian. Kontrak API bagian 7: pekerjaan yang baru dijadwalkan. */
@@ -451,6 +452,7 @@ async function processCopyJob(
           createNineRouterTextProvider({
             apiKey: env.NINEROUTER_API_KEY,
             baseUrl: env.NINEROUTER_BASE_URL,
+            model: env.NINEROUTER_TEXT_MODEL,
           }),
         ]
       : []),

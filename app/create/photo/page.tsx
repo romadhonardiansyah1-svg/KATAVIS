@@ -182,6 +182,57 @@ export default function PhotoPage(): React.JSX.Element {
         </p>
       ) : null}
 
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>Gaya foto studio</legend>
+        <p className={styles.hint}>
+          Pilih suasana foto hasil. Boleh dikosongkan — bawaannya Marmer Terang.
+        </p>
+        {(
+          [
+            ["marble_light", "Marmer Terang"],
+            ["wood_warm", "Kayu Hangat"],
+            ["dark_gradient", "Latar Gelap"],
+            ["rattan_natural", "Rotan Alami"],
+            ["clay_minimal", "Minimalis Tanah Liat"],
+          ] as const
+        ).map(([value, label]) => (
+          <label key={value} className={styles.statusRow} htmlFor={`gaya-${value}`}>
+            <input
+              id={`gaya-${value}`}
+              type="radio"
+              name="gaya-foto"
+              value={value}
+              checked={(draft.imageStyle ?? "marble_light") === value}
+              onChange={() => {
+                update({ imageStyle: value });
+              }}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="keinginan-foto">
+          Keinginan gaya foto (boleh dikosongkan)
+        </label>
+        <p className={styles.hint}>
+          Tulis dengan kata sendiri, misalnya &ldquo;latar sawah sore
+          hari&rdquo;. AI akan mempertajamnya menjadi arahan foto yang lengkap.
+        </p>
+        <textarea
+          id="keinginan-foto"
+          className={styles.transcriptField}
+          rows={2}
+          maxLength={500}
+          placeholder="Contoh: latar sawah sore hari"
+          value={draft.imagePromptManual ?? ""}
+          onChange={(event) => {
+            update({ imagePromptManual: event.target.value });
+          }}
+        />
+      </div>
+
       <input
         ref={inputRef}
         className={styles.visuallyHidden}

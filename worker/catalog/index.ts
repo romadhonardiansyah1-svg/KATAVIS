@@ -5,6 +5,8 @@
  *
  *   products.ts    pembuatan, transisi status, penerbitan, penghapusan,
  *                  permintaan pemrosesan (gerbang ADR-008)
+ *   studio-prompt.ts prompt foto studio: otomatis per produk, template gaya,
+ *                  dan penajaman keinginan manual oleh AI
  *   content.ts     konten per bahasa dan penyuntingannya
  *   transcript.ts  simpan, tinjau, dan sunting transkrip
  *   consent.ts     persetujuan audio_processing dan publication
@@ -87,3 +89,11 @@ export type {
 export { buildCaptions } from "./narration";
 
 export type { Caption } from "./narration";
+
+export {
+  IMAGE_STYLE_LABELS,
+  buildAutoStudioPrompt,
+  buildSharpenInstruction,
+  cleanSharpenedPrompt,
+  styleDirection,
+} from "./studio-prompt";

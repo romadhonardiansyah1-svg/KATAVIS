@@ -33,6 +33,7 @@ import {
   CaregiverInviteSchema,
   ConsentSchema,
   ExportRequestSchema,
+  ImagePromptRequestSchema,
   LIMITS,
   LocaleSchema,
   MediaPatchSchema,
@@ -74,7 +75,10 @@ import {
 } from "./auth";
 import { logActivity } from "./audit";
 import {
+  buildAutoStudioPrompt,
   buildCaptions,
+  buildSharpenInstruction,
+  cleanSharpenedPrompt,
   createProduct,
   deleteProduct,
   loadConsents,
@@ -99,6 +103,7 @@ import {
 } from "./db";
 import { buildExport, type ExportProduct } from "./export";
 import {
+  WORKERS_AI_TEXT_MODEL,
   canRetryJob,
   d1ClaimImageJobs,
   d1CompleteJob,
@@ -172,6 +177,8 @@ export interface Env {
   GROQ_API_KEY?: string;
   NINEROUTER_API_KEY?: string;
   NINEROUTER_BASE_URL?: string;
+  /** Model teks 9router. Bawaan `ba/glm-5.3-flash` bila kosong. */
+  NINEROUTER_TEXT_MODEL?: string;
   AGENT_SHARED_KEY?: string;
   JWT_SIGNING_KEY?: string;
   OTP_PROVIDER_KEY?: string;
@@ -961,6 +968,170 @@ route("POST", `${API_PREFIX}/products/:id/generate`, "session", async (context) 
 
   return apiOk({ jobs: result.jobs });
 });
+
+/**
+ * Penajaman prompt studio — `POST /products/:id/image-prompt`.
+ *
+ * Tiga mode dalam satu endpoint: tanpa `manual`, jawabannya adalah prompt
+ * otomatis dari transkrip (mode "auto"); dengan `manual`, AI mempertajam
+ * keinginan pengrajin menjadi prompt studio yang lengkap (mode "sharpened").
+ *
+ * Endpoint ini TIDAK PERNAH gagal dengan galat AI: bila seluruh lapis teks
+ * gagal, jawabannya adalah prompt otomatis. Alasannya praktis — layar foto
+ * membutuhkan prompt untuk melanjutkan, dan prompt otomatis selalu tersedia
+ * selama transkrip sudah ditinjau.
+ */
+route("POST", `${API_PREFIX}/products/:id/image-prompt`, "session", async (context) => {
+  const productId = paramOf(context, "id");
+  if (productId === null) return apiError("NOT_FOUND");
+
+  const access = await loadProductFor(context, productId, canEditDraft);
+  if (!access.ok) return access.response;
+
+  const parsed = ImagePromptRequestSchema.safeParse(await readJson(context.request));
+  if (!parsed.success) return apiError("CONTENT_INCOMPLETE");
+
+  const style = parsed.data.style ?? "marble_light";
+  const transcript = await loadTranscript(context.db, productId);
+  const label =
+    transcript !== null && transcript.text.trim().length > 0
+      ? `produk: "${transcript.text.trim().slice(0, 300)}"`
+      : "produk kerajinan tangan Nusantara";
+
+  const manual = parsed.data.manual?.trim() ?? "";
+  if (manual.length > 0) {
+    const sharpened = await sharpenStudioPrompt(
+      context.env,
+      buildSharpenInstruction(manual, label, style),
+    );
+    if (sharpened !== null) {
+      await audit(context, "sharpen_image_prompt", "product", productId);
+      return apiOk({ prompt: sharpened, mode: "sharpened", style });
+    }
+  }
+
+  return apiOk({ prompt: buildAutoStudioPrompt({ productLabel: label, style }), mode: "auto", style });
+});
+
+/**
+ * Mempertajam keinginan bebas menjadi prompt studio final.
+ *
+ * Rantai teks yang sama dengan copywriting (Groq → 9router → Workers AI),
+ * tetapi meminta TEKS prompt mentah, bukan JSON katalog. Setiap lapis
+ * dibatasi 20 detik; yang pertama mengembalikan teks valid menang.
+ * Mengembalikan `null` bila seluruh lapis gagal — pemanggil memakai prompt
+ * otomatis sebagai cadangan, bukan menampilkan galat.
+ */
+async function sharpenStudioPrompt(env: Env, instruction: string): Promise<string | null> {
+  const attempts: readonly (() => Promise<string | null>)[] = [
+    () => fetchChatText(
+      "https://api.groq.com/openai/v1/chat/completions",
+      env.GROQ_API_KEY,
+      "openai/gpt-oss-120b",
+      instruction,
+    ),
+    () =>
+      env.NINEROUTER_API_KEY === undefined || env.NINEROUTER_BASE_URL === undefined
+        ? Promise.resolve(null)
+        : fetchChatText(
+            `${env.NINEROUTER_BASE_URL.replace(/\/+$/, "")}/chat/completions`,
+            env.NINEROUTER_API_KEY,
+            env.NINEROUTER_TEXT_MODEL ?? "ba/glm-5.3-flash",
+            instruction,
+          ),
+    () => fetchWorkersAiText(env, instruction),
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const raw = await attempt();
+      if (raw !== null) {
+        const cleaned = cleanSharpenedPrompt(raw);
+        if (cleaned !== null) return cleaned;
+      }
+    } catch {
+      // Lapis berikutnya dicoba. Kegagalan seluruh lapis ditangani
+      // pemanggil dengan prompt otomatis.
+    }
+  }
+
+  return null;
+}
+
+/** Satu panggilan chat OpenAI-compatible yang mengembalikan teks mentah. */
+async function fetchChatText(
+  url: string,
+  apiKey: string | undefined,
+  model: string,
+  instruction: string,
+): Promise<string | null> {
+  if (apiKey === undefined) return null;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      "User-Agent": "KATAVIS/1.0",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: "You write commercial product photography prompts in Indonesian. Reply with the prompt text only.",
+        },
+        { role: "user", content: instruction },
+      ],
+      temperature: 0.5,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!response.ok) return null;
+
+  const raw = await response.text();
+  const cleaned = raw.replace(/data:\s*\[DONE\][\s\r\n]*$/, "").trim();
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+
+  if (typeof decoded !== "object" || decoded === null) return null;
+  const choices = (decoded as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const message = (choices[0] as { message?: unknown }).message;
+  if (typeof message !== "object" || message === null) return null;
+
+  const record = message as { content?: unknown; reasoning_content?: unknown };
+  if (typeof record.content === "string" && record.content.trim().length > 0) {
+    return record.content;
+  }
+  if (typeof record.reasoning_content === "string" && record.reasoning_content.trim().length > 0) {
+    return record.reasoning_content;
+  }
+  return null;
+}
+
+/** Teks mentah dari Workers AI untuk penajaman prompt. */
+async function fetchWorkersAiText(env: Env, instruction: string): Promise<string | null> {
+  try {
+    const response = (await env.AI.run(
+      WORKERS_AI_TEXT_MODEL as never,
+      { messages: [{ role: "user", content: instruction }] } as never,
+      { signal: AbortSignal.timeout(20_000) } as never,
+    )) as unknown;
+
+    if (typeof response !== "object" || response === null) return null;
+    const text = (response as Record<string, unknown>).response;
+    return typeof text === "string" && text.trim().length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
 
 // --- Audio dan transkrip (§6) ---
 
@@ -1825,6 +1996,7 @@ export default {
             GROQ_API_KEY: env.GROQ_API_KEY,
             NINEROUTER_API_KEY: env.NINEROUTER_API_KEY,
             NINEROUTER_BASE_URL: env.NINEROUTER_BASE_URL,
+            NINEROUTER_TEXT_MODEL: env.NINEROUTER_TEXT_MODEL,
           },
           nowMs,
           // Alamat publik Worker ini. Penyedia ASR mengambil berkas audionya

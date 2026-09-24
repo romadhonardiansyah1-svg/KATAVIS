@@ -119,6 +119,9 @@ yang lain. Ini alasan `product_content` dipisah per bahasa.
 | TC-U-CAT-06 | Berkas berekstensi `.jpg` dengan isi HTML | Ditolak berdasar magic bytes, bukan ekstensi |
 | TC-U-CAT-07 | Pembuatan slug dari nama berbahasa Indonesia | ASCII, unik, tanpa spasi |
 | TC-U-CAT-08 | Tabrakan slug | Imbuhan pembeda ditambahkan |
+| TC-U-CAT-09 | Prompt otomatis dua produk berbeda | Memuat isi transkrip masing-masing; tidak sama persis |
+| TC-U-CAT-10 | Lima gaya latar | Arahan komposisinya berbeda satu sama lain |
+| TC-U-CAT-11 | Penajaman manual saat AI gagal | Kembali prompt otomatis, bukan galat |
 
 TC-U-CAT-06 menguji kebiasaan yang sering terlewat: validasi berdasar ekstensi dapat ditembus.
 

@@ -66,6 +66,8 @@ export const ImageStyleSchema = z.enum([
   "marble_light",
   "wood_warm",
   "dark_gradient",
+  "rattan_natural",
+  "clay_minimal",
 ]);
 
 // --- Batas yang mengikat ---
@@ -187,6 +189,18 @@ export const GenerateRequestSchema = z.object({
   tasks: z.array(z.enum(["copy", "image", "tts"])).min(1),
   locales: z.array(LocaleSchema).min(1).max(5),
   imageStyle: ImageStyleSchema.optional(),
+  /**
+   * Prompt studio final, biasanya hasil penajaman AI atas keinginan
+   * pengrajin. Bila ada dan tidak kosong, dipakai apa adanya untuk
+   * pekerjaan gambar — server tidak menimpa pilihan eksplisit pengrajin.
+   */
+  imagePrompt: z.string().trim().min(1).max(2000).optional(),
+});
+
+export const ImagePromptRequestSchema = z.object({
+  style: ImageStyleSchema.optional(),
+  /** Keinginan gaya foto dari pengrajin, akan dipertajam oleh AI. */
+  manual: z.string().trim().max(500).optional(),
 });
 
 // --- Studio Agent (kontrak API bagian 8) ---

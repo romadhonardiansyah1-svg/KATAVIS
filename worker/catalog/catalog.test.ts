@@ -321,6 +321,57 @@ describe("catalog — permintaan pemrosesan", () => {
     ]);
   });
 
+  it("memakai prompt eksplisit pengrajin apa adanya untuk pekerjaan gambar", async () => {
+    // F2-12: pilihan eksplisit tidak ditimpa server.
+    const fake = generationDb(true);
+
+    const result = await requestGeneration(
+      fake.db,
+      artisan,
+      PRODUCT_ID,
+      {
+        tasks: ["image"],
+        locales: ["id"],
+        imageStyle: "wood_warm",
+        imagePrompt: "Foto produk di atas meja kayu jati yang hangat",
+      },
+      NOW_MS,
+    );
+
+    expect(result.ok).toBe(true);
+    const inserts = statementsContaining(fake, "INSERT INTO jobs");
+    expect(inserts).toHaveLength(1);
+    const payload = JSON.parse(inserts[0]?.params[4] as string) as {
+      style: string;
+      prompt: string;
+    };
+    expect(payload.style).toBe("wood_warm");
+    expect(payload.prompt).toBe("Foto produk di atas meja kayu jati yang hangat");
+  });
+
+  it("menyusun prompt otomatis dari transkrip bila tidak ada prompt eksplisit", async () => {
+    // F2-10: prompt menyesuaikan produk.
+    const fake = generationDb(true);
+
+    const result = await requestGeneration(
+      fake.db,
+      artisan,
+      PRODUCT_ID,
+      { tasks: ["image"], locales: ["id"], imageStyle: "dark_gradient" },
+      NOW_MS,
+    );
+
+    expect(result.ok).toBe(true);
+    const inserts = statementsContaining(fake, "INSERT INTO jobs");
+    const payload = JSON.parse(inserts[0]?.params[4] as string) as {
+      style: string;
+      prompt: string;
+    };
+    expect(payload.style).toBe("dark_gradient");
+    expect(payload.prompt).toContain("kulit kerbau");
+    expect(payload.prompt).toContain("SATU-SATUNYA objek");
+  });
+
   it("memajukan draft menjadi processing dalam putaran yang sama", async () => {
     const fake = generationDb(true);
 
