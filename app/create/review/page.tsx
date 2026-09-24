@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
 
 import { StepLoading, StepShell, type StepError } from "../StepShell";
-import { getProduct, patchContent, type ProductContent } from "../api";
+import { getProduct, patchContent, submitForReview, type ProductContent } from "../api";
 import styles from "../flow.module.css";
 import { CheckIcon, ClockIcon, DocumentIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
@@ -50,6 +50,7 @@ export default function ReviewPage(): React.JSX.Element {
   const { draft, savedAt, isSaving, update, goTo } = useCreateFlow("review");
   const [content, setContent] = useState<EditableContent | null>(null);
   const [otherLocales, setOtherLocales] = useState<readonly string[]>([]);
+  const [productStatus, setProductStatus] = useState<string | null>(null);
   const [photoOriginal, setPhotoOriginal] = useState<string | null>(null);
   const [photoStudio, setPhotoStudio] = useState<string | null>(null);
   const [socialCopy, setSocialCopy] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export default function ReviewPage(): React.JSX.Element {
       }
 
       setContent(toEditable(result.data.content[SOURCE_LOCALE]));
+      setProductStatus(result.data.status);
       setOtherLocales(
         Object.keys(result.data.content).filter((locale) => locale !== SOURCE_LOCALE),
       );
@@ -124,6 +126,20 @@ export default function ReviewPage(): React.JSX.Element {
         setError({ message: patched.error.message, action: patched.error.action });
         return;
       }
+    }
+
+    // Pengajuan tinjauan hanya dari status processing. Tanpa ini, publish
+    // selalu gagal karena transisi processing → published tidak ada.
+    // Pengecekan status mencegah pengajuan ganda saat pengguna menekan
+    // tombol dua kali atau kembali ke halaman ini.
+    if (productStatus === "processing") {
+      const submitted = await submitForReview(token, productId);
+      if (!submitted.ok) {
+        setIsBusy(false);
+        setError({ message: submitted.error.message, action: submitted.error.action });
+        return;
+      }
+      setProductStatus(submitted.data.status);
     }
 
     setIsBusy(false);

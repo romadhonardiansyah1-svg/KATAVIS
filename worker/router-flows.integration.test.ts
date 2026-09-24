@@ -40,6 +40,7 @@ const CONTRACT_ENDPOINTS: readonly (readonly [string, string])[] = [
   ["GET", "/api/v1/products/:id"],
   ["PATCH", "/api/v1/products/:id/content/:locale"],
   ["POST", "/api/v1/products/:id/publish"],
+  ["POST", "/api/v1/products/:id/submit"],
   ["DELETE", "/api/v1/products/:id"],
   ["POST", "/api/v1/products/:id/media/upload-url"],
   ["POST", "/api/v1/products/:id/media/:mediaId/confirm"],
@@ -342,7 +343,9 @@ describe("router — prompt studio", () => {
     expect(body.data.mode).toBe("auto");
     expect(body.data.style).toBe("wood_warm");
     expect(body.data.prompt).toContain("Tas anyaman pandan");
-    expect(body.data.prompt).toContain("SATU-SATUNYA objek");
+    // Prompt server adalah arah kreatif murni; aturan pelestarian
+    // ditambahkan agen, bukan di sini.
+    expect(body.data.prompt).not.toContain("saya lampirkan");
   });
 
   it("menolak gaya yang tidak dikenal", async () => {
@@ -370,6 +373,61 @@ describe("router — prompt studio", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe("router — pengajuan tinjauan", () => {
+  it("memajukan processing menjadi review agar publish dapat berjalan", async () => {
+    // TC-I-19. Tanpa endpoint ini tidak ada penggerak transisi
+    // processing → review, dan publish selalu menjawab FORBIDDEN.
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    await env.DB.prepare("UPDATE products SET status = 'processing' WHERE id = ?")
+      .bind(productId)
+      .run();
+
+    const submitted = await call(`/api/v1/products/${productId}/submit`, auth(token, { method: "POST" }));
+    expect(submitted.status).toBe(200);
+    expect((await json(submitted)) as { data: { status: string } }).toMatchObject({
+      data: { status: "review" },
+    });
+
+    const row = await env.DB.prepare("SELECT status FROM products WHERE id = ?")
+      .bind(productId)
+      .first<{ status: string }>();
+    expect(row?.status).toBe("review");
+  });
+
+  it("menolak pengajuan kedua karena status sudah review", async () => {
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    await env.DB.prepare("UPDATE products SET status = 'processing' WHERE id = ?")
+      .bind(productId)
+      .run();
+
+    await call(`/api/v1/products/${productId}/submit`, auth(token, { method: "POST" }));
+    const repeated = await call(`/api/v1/products/${productId}/submit`, auth(token, { method: "POST" }));
+
+    expect(repeated.status).toBe(403);
+  });
+
+  it("menolak publish langsung dari processing", async () => {
+    // Mengunci penjagaan mesin status: publish hanya dari review.
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    await env.DB.prepare("UPDATE products SET status = 'processing' WHERE id = ?")
+      .bind(productId)
+      .run();
+
+    const response = await call(
+      `/api/v1/products/${productId}/publish`,
+      auth(token, {
+        method: "POST",
+        body: JSON.stringify({ consentConfirmed: true }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
   });
 });
 

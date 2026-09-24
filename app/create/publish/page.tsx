@@ -15,13 +15,13 @@
  * sadar.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
 import { announce, notify } from "@/lib/notify";
 
 import { StepLoading, StepShell, type StepError } from "../StepShell";
-import { publishProduct, publicCatalogUrl, setConsent } from "../api";
+import { getProduct, publishProduct, publicCatalogUrl, setConsent } from "../api";
 import styles from "../flow.module.css";
 import { CheckIcon, LinkIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
@@ -38,11 +38,83 @@ export default function PublishPage(): React.JSX.Element {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<StepError | null>(null);
   const [slug, setSlug] = useState<string | null>(draft?.slug ?? null);
+  const [studioUrl, setStudioUrl] = useState<string | null>(null);
+  const [caption, setCaption] = useState<string | null>(null);
+  const [story, setStory] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadResult();
+  }, []);
 
   if (draft === null) return <StepLoading />;
 
   const productId = draft.productId;
   const published = draft.publishedAt !== null && slug !== null;
+
+  async function loadResult(): Promise<void> {
+    // Paket siap posting (foto + teks) diambil sekali saat layar dibuka.
+    // Tanpa ini, layar akhir hanya berisi tautan — padahal tujuan produk
+    // adalah katalog yang diunduh dan disalin untuk diposting manual.
+    if (productId === null) return;
+    const token = readAccessToken();
+    if (token === null) return;
+
+    const result = await getProduct(token, productId);
+    if (!result.ok) return;
+
+    const photo =
+      result.data.media.find((item) => item.kind === "photo_studio" && item.isPrimary) ??
+      result.data.media.find((item) => item.kind === "photo_studio") ??
+      result.data.media.find((item) => item.kind === "photo_original");
+    setStudioUrl(photo?.url ?? null);
+    setCaption(result.data.content["id"]?.socialCopy ?? null);
+    setStory(result.data.content["id"]?.story ?? null);
+  }
+
+  async function downloadPhoto(): Promise<void> {
+    if (studioUrl === null) return;
+    setNotice(null);
+
+    try {
+      const response = await fetch(studioUrl);
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `${slug ?? "katalog-katavis"}.jpg`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+      setNotice("Foto terunduh. Siap diposting.");
+    } catch {
+      // Unduhan langsung gagal (misal CORS): buka di tab baru agar
+      // pengrajin tetap bisa menyimpan manual.
+      window.open(studioUrl, "_blank", "noopener");
+      setNotice("Foto dibuka di tab baru. Simpan manual dari sana.");
+    }
+  }
+
+  async function copyText(text: string | null, label: string): Promise<void> {
+    if (text === null || text.length === 0) {
+      setNotice(`${label} belum tersedia.`);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    setNotice(`${label} disalin. Siap ditempel di postingan.`);
+  }
 
   /** Menampilkan galat sekaligus membunyikan kanal gagal (S10, tabel). */
   function fail(next: StepError): void {
@@ -123,6 +195,49 @@ export default function PublishPage(): React.JSX.Element {
           <p className={styles.hint}>
             Alamat katalog Anda: {slug === null ? "-" : publicCatalogUrl(slug)}
           </p>
+
+          <div className={styles.field}>
+            <p className={styles.label}>Paket siap posting</p>
+            <p className={styles.hint}>
+              Unduh fotonya dan salin teksnya, lalu posting manual di
+              marketplace atau media sosial Anda.
+            </p>
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => {
+                void downloadPhoto();
+              }}
+              disabled={studioUrl === null}
+            >
+              Unduh foto studio
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => {
+                void copyText(caption, "Caption");
+              }}
+              disabled={caption === null}
+            >
+              Salin caption
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => {
+                void copyText(story, "Cerita produk");
+              }}
+              disabled={story === null}
+            >
+              Salin cerita produk
+            </button>
+            {notice === null ? null : (
+              <p className={styles.statusRow} role="status">
+                {notice}
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <>

@@ -164,6 +164,7 @@ Dijalankan di `workerd` dengan D1 dan R2 lokal dari Miniflare.
 | TC-I-16 | Baca objek media lewat URL bertanda tangan | Isi berkas terkirim dengan `Content-Type` yang benar |
 | TC-I-17 | URL baca media setelah kedaluwarsa | Ditolak |
 | TC-I-18 | `media[].url` pada katalog publik dan detail produk | Berupa URL yang dapat dimuat peramban, bukan kunci R2 mentah |
+| TC-I-19 | Pengajuan tinjauan sebelum publish | `processing` menjadi `review`; publish langsung dari `processing` ditolak |
 
 TC-I-04 adalah pengujian keamanan paling penting di lapis ini. `Fitur pendukung.pdf` halaman 5
 menyatakan "Pengrajin dapat mencabut akses kapan saja". Pencabutan yang hanya mengubah baris basis

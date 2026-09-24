@@ -200,13 +200,29 @@ berbahaya. Implementasi wajib memakai `batch()`. Diuji di TC-PERF-04.
 
 Seluruh bidang opsional. Yang dikirim diperbarui; `source` otomatis menjadi `ai_edited`.
 
+### `POST /products/:id/submit`
+
+Mengajukan produk untuk ditinjau: status `processing` menjadi `review`.
+Tanpa memanggil endpoint ini, `POST .../publish` selalu menolak dengan
+`FORBIDDEN` karena transisi `processing → published` tidak ada.
+
+```json
+// Permintaan
+{}
+
+// Respons
+{ "ok": true, "data": { "id": "01J...", "status": "review" } }
+```
+
+Menolak bila: pemanggil bukan pemilik atau pendamping berizin
+`submit_review` (`FORBIDDEN`), atau status bukan `processing` (`FORBIDDEN`).
+
 ### `POST /products/:id/publish`
 
 ```json
 // Permintaan
 { "consentConfirmed": true }
 ```
-
 Menolak bila: persetujuan publikasi belum ada (`CONSENT_REQUIRED`), konten `id` belum lengkap
 (`CONTENT_INCOMPLETE`), tidak ada foto utama (`PHOTO_REQUIRED`), atau pemanggil adalah pendamping
 (`FORBIDDEN`).

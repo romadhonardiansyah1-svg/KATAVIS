@@ -294,6 +294,19 @@ export function publishProduct(
   });
 }
 
+/**
+ * Mengajukan produk untuk ditinjau (`processing` → `review`).
+ *
+ * Wajib dipanggil sebelum publish: transisi `processing → published`
+ * tidak ada, sehingga publish langsung selalu menjawab FORBIDDEN.
+ */
+export function submitForReview(
+  token: string,
+  productId: string,
+): Promise<ApiResult<{ readonly id: string; readonly status: string }>> {
+  return jsonRequest(`/products/${productId}/submit`, token, "POST", {});
+}
+
 // --- Persetujuan (§3) ---
 
 export function setConsent(

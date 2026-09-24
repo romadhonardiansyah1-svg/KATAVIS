@@ -89,6 +89,7 @@ import {
   publishProduct,
   requestGeneration,
   setConsent,
+  submitForReview,
   submitTranscript,
 } from "./catalog";
 import {
@@ -899,6 +900,32 @@ route("PATCH", `${API_PREFIX}/products/:id/content/:locale`, "session", async (c
   await audit(context, "patch_content", "product", productId);
 
   return apiOk({ locale, source: written.content?.source ?? "ai_edited" });
+});
+
+/**
+ * Mengajukan produk untuk ditinjau — `processing` menjadi `review`.
+ *
+ * Tanpa rute ini, tidak ada penggerak transisi `processing → review` sama
+ * sekali: halaman tinjau (Langkah 5) hanya menyunting konten, dan
+ * `POST .../publish` menolak status `processing` dengan FORBIDDEN. Inilah
+ * yang membuat tombol Terbitkan selalu gagal.
+ */
+route("POST", `${API_PREFIX}/products/:id/submit`, "session", async (context) => {
+  const productId = paramOf(context, "id");
+  if (productId === null) return apiError("NOT_FOUND");
+
+  const session = sessionOf(context);
+  const result = await submitForReview(
+    context.db,
+    { id: session.userId, role: session.role, sessionTokenVersion: session.sessionTokenVersion, currentTokenVersion: session.currentTokenVersion },
+    productId,
+    context.nowMs,
+  );
+  if (!result.ok) return apiError(result.code);
+
+  await audit(context, "submit_review", "product", productId);
+
+  return apiOk({ id: productId, status: result.product.status });
 });
 
 route("POST", `${API_PREFIX}/products/:id/publish`, "session", async (context) => {

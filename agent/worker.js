@@ -384,22 +384,24 @@ async function newestImage(page, countBefore) {
 /**
  * Mengunduh gambar hasil sebagai bita.
  *
- * Tiga jalur dicoba berurutan, dari yang paling hemat sampai yang paling
- * kasar:
+ * Dua jalur, dari yang paling tepat sampai yang paling resmi:
  *
  *   1. Ambil `src` langsung bila sudah berupa `data:` URL. Ini jalur yang
  *      paling sering berlaku pada Gemini.
- *   2. Minta halamannya mengambil bita lewat `fetch` (cepat, tanpa menunggu
- *      peristiwa unduhan). Bekerja untuk `blob:` maupun `https:` karena
- *      berjalan di konteks halaman yang punya cookie sesi.
- *   3. Klik tombol unduh dan tangkap berkasnya lewat peristiwa unduhan.
- *   4. Tangkapan layar elemen gambar hasil sebagai PNG. Piksel di layar
- *      adalah kebenaran terakhir: bila `src` sudah kedaluwarsa sekalipun,
- *      yang terlihat tetap dapat disimpan.
+ *   2. Klik tombol unduh ("Download gambar ukuran penuh") dan tangkap
+ *      berkasnya lewat peristiwa unduhan. Ini berkas ASLI resolusi penuh
+ *      dari Gemini — bukan tangkapan layar.
+ *   3. Minta halamannya mengambil bita lewat `fetch`. Bekerja untuk `blob:`
+ *      maupun `https:` karena berjalan di konteks halaman yang punya cookie
+ *      sesi.
  *
- * Jalur ketiga ada karena gambar dapat dilayani dari URL berumur pendek yang
- * menuntut cookie sesi; memintanya dari konteks peramban membawa cookie itu
- * tanpa perlu menyalinnya ke mana pun.
+ * Yang SENGAJA tidak ada: tangkapan layar elemen sebagai "hasil". Dua aset
+ * yang pernah tersimpan lewat jalur itu terbukti berisi BELUM tentu gambar
+ * hasil — satu memuat tombol UI Gemini di dalam pikselnya (tangkapan
+ * menangkap seluruh komposit kotak itu, termasuk overlay), satu lagi
+ * menangkap foto input + kolom chat. Tangkapan layar tidak dapat
+ * membedakan ketiganya, jadi kegagalan unduhan dikembalikan sebagai gagal
+ * dan rantai fallback (Workers AI → foto asli) yang bekerja jujur.
  *
  * Menerima HASIL deteksi (alamat + selector + indeks), bukan locator:
  * alamat ditangkap pada saat deteksi, sehingga unduhan tidak bergantung
@@ -418,17 +420,11 @@ async function downloadImage(found, context) {
     return inline;
   }
 
-  const fetched = await fetchViaPage(found.src, page).catch(() => null);
-  if (fetched !== null && fetched.bytes.byteLength > 0) {
-    log(`Unduh via fetch halaman: ${fetched.bytes.byteLength} bita (${fetched.mimeType}).`);
-    return fetched;
-  }
-
-  const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 3_000);
+  const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 5_000);
   if (downloadButton !== null) {
     try {
       const [download] = await Promise.all([
-        page.waitForEvent("download", { timeout: 10_000 }),
+        page.waitForEvent("download", { timeout: 15_000 }),
         downloadButton.click(),
       ]);
       const stream = await download.createReadStream();
@@ -443,14 +439,26 @@ async function downloadImage(found, context) {
         log(`Unduh via tombol unduh: ${result.bytes.byteLength} bita (${result.mimeType}).`);
         return result;
       }
-    } catch {
-      // Tombol unduh tidak membawa hasil. Jatuh ke jalur berikutnya.
+      log("Tombol unduh diklik tetapi berkasnya kosong.");
+    } catch (err) {
+      log(
+        `Tombol unduh tidak membawa hasil: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}.`,
+      );
     }
+  } else {
+    log("Tombol unduh tidak ditemukan di halaman.");
   }
 
-  const shot = await screenshotImage(found, page, log).catch(() => null);
-  if (shot !== null) return shot;
+  const fetched = await fetchViaPage(found.src, page, log).catch((err) => {
+    log(`Fetch halaman gagal: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}.`);
+    return null;
+  });
+  if (fetched !== null && fetched.bytes.byteLength > 0) {
+    log(`Unduh via fetch halaman: ${fetched.bytes.byteLength} bita (${fetched.mimeType}).`);
+    return fetched;
+  }
 
+  log("Seluruh jalur unduhan gagal. Pekerjaan diserahkan ke penyedia cadangan.");
   return null;
 }
 
@@ -478,58 +486,61 @@ function inlineDataUrl(source) {
 /**
  * @param {string} source
  * @param {import("@playwright/test").Page} page
+ * @param {(line: string) => void} log
  * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
  */
-async function fetchViaPage(source, page) {
-  if (source.length === 0) return null;
+async function fetchViaPage(source, page, log) {
+  if (source.length === 0) {
+    log("Fetch halaman dilewati: alamat gambar kosong.");
+    return null;
+  }
 
   const encoded = await page
     .evaluate(async (url) => {
-      const response = await fetch(url);
-      if (!response.ok) return null;
-      const buffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = "";
-      for (const byte of bytes) binary += String.fromCharCode(byte);
-      return btoa(binary);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return { error: `status ${response.status}` };
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength === 0) return { error: "badan kosong" };
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return { data: btoa(binary) };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message.split("\n")[0] : String(err) };
+      }
     }, source)
-    .catch(() => null);
+    .catch((err) => ({ error: `evaluate: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}` }));
 
-  if (encoded === null) return null;
+  if (encoded === null || typeof encoded !== "object" || !("data" in encoded)) {
+    const reason =
+      encoded !== null && typeof encoded === "object" && "error" in encoded
+        ? String(encoded.error)
+        : "tidak diketahui";
+    log(`Fetch halaman gagal: ${reason}.`);
+    return null;
+  }
 
-  const bytes = new Uint8Array(Buffer.from(encoded, "base64"));
+  const payload = encoded.data;
+  if (typeof payload !== "string") {
+    log("Fetch halaman gagal: badan bukan teks.");
+    return null;
+  }
+
+  const bytes = new Uint8Array(Buffer.from(payload, "base64"));
   return bytes.byteLength > 0 ? { bytes, mimeType: mimeFromBytes(bytes) } : null;
 }
 
 /**
- * Tangkapan layar elemen gambar hasil sebagai PNG.
+ * Dihapus: tangkapan layar elemen sebagai "hasil" (dihentikan Sep 2026).
  *
- * Jalur terakhir bila ketiga jalur unduhan gagal: piksel yang terlihat di
- * layar adalah gambar hasil itu sendiri. Locator dicari ulang dari selector
- * dan indeks yang ditangkap saat deteksi, lalu elemennya difoto langsung.
- * Hasilnya SELALU gambar yang tampil di layar (gambar hasil Gemini), tidak
- * pernah foto input — karena selectornya hanya `generated-image`.
- *
- * @param {{ selector: string, index: number }} found
- * @param {import("@playwright/test").Page} page
- * @param {(line: string) => void} log
- * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
+ * Dua aset yang tersimpan lewat jalur ini terbukti BUKAN gambar hasil:
+ * satu memuat tombol UI Gemini di dalam pikselnya (tangkapan menangkap
+ * seluruh komposit kotak itu termasuk overlay), satu lagi menangkap foto
+ * input + kolom chat. Tangkapan layar tidak dapat membedakan ketiganya,
+ * sehingga kegagalan unduhan sekarang dikembalikan sebagai gagal dan rantai
+ * fallback (Workers AI → foto asli) bekerja dengan jujur.
  */
-async function screenshotImage(found, page, log) {
-  const all = page.locator(found.selector);
-  const count = await all.count().catch(() => 0);
-  // DOM dapat berubah antara deteksi dan unduhan; bila indeks yang
-  // ditangkap sudah di luar jangkauan, pakai gambar terbaru yang ada.
-  const target = count > found.index ? all.nth(found.index) : all.nth(count - 1);
-  if (count === 0) return null;
-  await target.scrollIntoViewIfNeeded().catch(() => undefined);
-  const buffer = await target.screenshot({ timeout: 10_000 }).catch(() => null);
-  if (buffer === null || buffer.byteLength < 1024) return null;
-
-  const bytes = new Uint8Array(buffer);
-  log(`Unduh via tangkapan layar: ${bytes.byteLength} bita (image/png).`);
-  return { bytes, mimeType: "image/png" };
-}
 
 /**
  * @param {readonly Uint8Array[]} chunks
