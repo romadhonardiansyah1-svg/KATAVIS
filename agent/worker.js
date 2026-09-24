@@ -23,6 +23,10 @@
  * utuh karena tidak ada satu baris pun di sini yang menyentuhnya. TC-E2E-13.
  */
 
+import { writeFileSync, unlinkSync } from "node:fs";
+import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+
 import { AgentRuntimeError, GEMINI_SELECTORS, reasonFromFailure } from "./chrome.js";
 import { ApiRequestError } from "./api.js";
 
@@ -85,10 +89,46 @@ export async function generateInGemini(job, dependencies) {
   // Kalimat itu TIDAK ditambahkan di sini: menambahkannya di dua tempat
   // berarti dua tempat yang dapat berbeda pendapat, dan yang berlaku
   // sesungguhnya adalah yang dikirim server.
+  let tempFile = null;
+  try {
+    const imageBytes = await dependencies.client.getBinary(`/agent/jobs/${job.id}/source-image`);
+    if (imageBytes !== null && imageBytes.byteLength > 0) {
+      tempFile = resolve(tmpdir(), `katavis-source-${job.id}.png`);
+      writeFileSync(tempFile, imageBytes);
+
+      log("Melampirkan foto asli produk ke Gemini web...");
+      let fileInput = page.locator('input[type="file"]').first();
+      if ((await fileInput.count()) === 0) {
+        const uploadBtn = page
+          .locator('button[aria-label*="Upload" i], button[aria-label*="Unggah" i], button[aria-label*="tambah" i]')
+          .first();
+        if ((await uploadBtn.count()) > 0) {
+          await uploadBtn.click();
+          await page.waitForTimeout(600);
+        }
+      }
+      fileInput = page.locator('input[type="file"]').first();
+      if ((await fileInput.count()) > 0) {
+        await fileInput.setInputFiles(tempFile);
+        log("Foto asli produk berhasil dilampirkan ke Gemini.");
+        await page.waitForTimeout(2000);
+      }
+    }
+  } catch (err) {
+    log(`Peringatan lampiran foto: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const promptText =
-    job.prompt.trim().length > 0
-      ? job.prompt
-      : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
+    tempFile !== null
+      ? `Tolong buatkan foto produk komersial studio profesional berkualitas tinggi dari produk kerajinan tangan pada foto yang saya lampirkan ini.
+
+Instruksi penting:
+1. Ambil objek produk kerajinan pada foto lampiran. Pertahankan 100% bentuk, warna, tekstur bahan, dan seluruh detail asli produk tersebut. Jangan mengubah bentuk produknya.
+2. Letakkan produk ini di atas meja permukaan marmer elegan dengan pencahayaan studio komersial lembut (soft studio lighting) dari sudut kiri atas, serta bayangan kontak alami yang realistis di bawah produk.
+3. Latar belakang studio komersial yang bersih, estetik, dan mewah layaknya foto katalog produk pameran seni kriya.`
+      : job.prompt.trim().length > 0
+        ? job.prompt
+        : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
 
   await assertSessionAlive(page);
 
@@ -114,9 +154,19 @@ export async function generateInGemini(job, dependencies) {
   }
   await sendButton.click();
 
-  log("Prompt terkirim. Menunggu gambar.");
+  log("Prompt dan foto terkirim ke Gemini. Menunggu hasil gambar...");
 
-  return waitForImage(job, { ...dependencies, imageCountBefore });
+  try {
+    return await waitForImage(job, { ...dependencies, imageCountBefore });
+  } finally {
+    if (tempFile !== null) {
+      try {
+        unlinkSync(tempFile);
+      } catch {
+        // Abaikan pembersihan berkas sementara
+      }
+    }
+  }
 }
 
 /**

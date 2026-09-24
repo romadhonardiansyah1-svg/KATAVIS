@@ -1528,6 +1528,35 @@ route("POST", `${API_PREFIX}/agent/jobs/:jobId/complete`, "agent", async (contex
   return apiOk({ id: jobId, status: "succeeded" });
 });
 
+route("GET", `${API_PREFIX}/agent/jobs/:jobId/source-image`, "agent", async (context) => {
+  const jobId = paramOf(context, "jobId");
+  if (jobId === null) return apiError("NOT_FOUND");
+
+  const job = await d1FindJob(context.env.DB, jobId);
+  if (job === null) return apiError("NOT_FOUND");
+
+  const media = await context.env.DB.prepare(
+    `SELECT r2_key, mime_type FROM media_assets
+     WHERE product_id = ? AND kind = 'photo_original' AND upload_status = 'confirmed'
+     ORDER BY created_at LIMIT 1`,
+  )
+    .bind(job.productId)
+    .first<{ readonly r2_key: string; readonly mime_type: string }>();
+
+  if (media === null) return apiError("NOT_FOUND");
+
+  const object = await context.env.MEDIA.get(media.r2_key);
+  if (object === null) return apiError("NOT_FOUND");
+
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      "Content-Type": media.mime_type,
+      "Content-Length": String(object.size),
+    },
+  });
+});
+
 route("POST", `${API_PREFIX}/agent/jobs/:jobId/fail`, "agent", async (context) => {
   const jobId = paramOf(context, "jobId");
   if (jobId === null) return apiError("NOT_FOUND");

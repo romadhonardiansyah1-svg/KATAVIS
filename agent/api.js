@@ -125,6 +125,27 @@ export class AgentApiClient {
   }
 
   /**
+   * Mengunduh berkas biner dari Worker lewat endpoint agen.
+   *
+   * @param {string} path
+   * @returns {Promise<Uint8Array | null>}
+   */
+  async getBinary(path) {
+    const url = `${this.baseUrl}/api/v1${path}`;
+    try {
+      const response = await fetch(url, {
+        headers: { "X-Agent-Key": this.agentKey },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const buffer = await response.arrayBuffer();
+      return new Uint8Array(buffer);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Mengunggah biner langsung ke URL bertanda tangan.
    *
    * Kontrak API bagian 5: `uploadUrl` adalah URL bertanda tangan milik Worker,
