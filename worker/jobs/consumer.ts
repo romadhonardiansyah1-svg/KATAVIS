@@ -240,7 +240,11 @@ async function processImageJob(
   const outcome = await runProviderChain(steps, "IMAGE_GENERATE_FAILED");
 
   if (!outcome.ok) {
-    log(`Pekerjaan gambar ${context.id} gagal: ${outcome.failure.code}.`);
+    log(
+      `Pekerjaan gambar ${context.id} gagal: ${outcome.failure.code} ` +
+        `(lapis terakhir ${outcome.failure.provider ?? "tidak ada"}, ` +
+        `${outcome.failure.layersTried} lapis dicoba). ${outcome.failure.diagnostic}`,
+    );
     return failOrRetry(context, outcome.failure.code, dependencies);
   }
 
@@ -464,7 +468,11 @@ async function processCopyJob(
   const outcome = await runProviderChain(steps, "COPY_GENERATE_FAILED");
 
   if (!outcome.ok) {
-    log(`Pekerjaan teks ${context.id} gagal: ${outcome.failure.code}.`);
+    log(
+      `Pekerjaan teks ${context.id} gagal: ${outcome.failure.code} ` +
+        `(lapis terakhir ${outcome.failure.provider ?? "tidak ada"}, ` +
+        `${outcome.failure.layersTried} lapis dicoba). ${outcome.failure.diagnostic}`,
+    );
     return failOrRetry(context, outcome.failure.code, dependencies);
   }
 

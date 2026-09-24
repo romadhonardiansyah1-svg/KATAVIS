@@ -96,12 +96,19 @@ export async function generateInGemini(job, dependencies) {
   // berarti dua tempat yang dapat berbeda pendapat, dan yang berlaku
   // sesungguhnya adalah yang dikirim server.
   let tempFile = null;
+  let attachedBytes = 0;
   try {
     const imageBytes = await dependencies.client.getBinary(`/agent/jobs/${job.id}/source-image`);
     if (imageBytes !== null && imageBytes.byteLength > 0) {
+      attachedBytes = imageBytes.byteLength;
       tempFile = resolve(tmpdir(), `katavis-source-${job.id}.png`);
       writeFileSync(tempFile, imageBytes);
+      log(`Foto asli produk diambil dari server: ${attachedBytes} bita.`);
 
+      const blobsBefore = await page
+        .locator('img[src^="blob:"]')
+        .count()
+        .catch(() => 0);
       log("Melampirkan foto asli produk ke Gemini web...");
       let fileInput = page.locator('input[type="file"]').first();
       if ((await fileInput.count()) === 0) {
@@ -116,9 +123,24 @@ export async function generateInGemini(job, dependencies) {
       fileInput = page.locator('input[type="file"]').first();
       if ((await fileInput.count()) > 0) {
         await fileInput.setInputFiles(tempFile);
-        log("Foto asli produk berhasil dilampirkan ke Gemini.");
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(2500);
+        const blobsAfter = await page
+          .locator('img[src^="blob:"]')
+          .count()
+          .catch(() => blobsBefore);
+        if (blobsAfter > blobsBefore) {
+          log(`Foto asli produk berhasil dilampirkan ke Gemini (pratinjau tampil).`);
+        } else {
+          log(
+            "Peringatan: pratinjau lampiran tidak terdeteksi di chat. " +
+              "Foto mungkin tetap terlampir; melanjutkan dengan prompt teks.",
+          );
+        }
+      } else {
+        log("Peringatan: kolom unggah berkas tidak ditemukan. Melanjutkan dengan prompt teks.");
       }
+    } else {
+      log("Peringatan: foto asli tidak tersedia di server. Melanjutkan dengan prompt teks.");
     }
   } catch (err) {
     log(`Peringatan lampiran foto: ${err instanceof Error ? err.message : String(err)}`);
@@ -310,7 +332,7 @@ async function waitForImage(job, context) {
  *
  * @param {import("@playwright/test").Page} page
  * @param {number} countBefore
- * @returns {Promise<{ src: string, width: number, height: number } | null>}
+ * @returns {Promise<{ selector: string, index: number, src: string, width: number, height: number } | null>}
  */
 async function newestImage(page, countBefore) {
   for (const selector of GEMINI_SELECTORS.generatedImage) {
@@ -319,7 +341,8 @@ async function newestImage(page, countBefore) {
       const count = await locator.count();
       if (count <= countBefore) continue;
 
-      const last = locator.nth(count - 1);
+      const index = count - 1;
+      const last = locator.nth(index);
       const src = await last.getAttribute("src").catch(() => null);
       if (src === null || src.length === 0) continue;
 
@@ -332,6 +355,8 @@ async function newestImage(page, countBefore) {
         .catch(() => null);
 
       return {
+        selector,
+        index,
         src: size?.currentSrc && size.currentSrc.length > 0 ? size.currentSrc : src,
         width: size?.width ?? 0,
         height: size?.height ?? 0,
@@ -352,32 +377,46 @@ async function newestImage(page, countBefore) {
  *
  *   1. Ambil `src` langsung bila sudah berupa `data:` URL. Ini jalur yang
  *      paling sering berlaku pada Gemini.
- *   2. Klik tombol unduh dan tangkap berkasnya lewat peristiwa unduhan.
- *   3. Ambil `src` apa pun dan minta halamannya yang mengambil bita.
+ *   2. Minta halamannya mengambil bita lewat `fetch` (cepat, tanpa menunggu
+ *      peristiwa unduhan). Bekerja untuk `blob:` maupun `https:` karena
+ *      berjalan di konteks halaman yang punya cookie sesi.
+ *   3. Klik tombol unduh dan tangkap berkasnya lewat peristiwa unduhan.
+ *   4. Tangkapan layar elemen gambar hasil sebagai PNG. Piksel di layar
+ *      adalah kebenaran terakhir: bila `src` sudah kedaluwarsa sekalipun,
+ *      yang terlihat tetap dapat disimpan.
  *
  * Jalur ketiga ada karena gambar dapat dilayani dari URL berumur pendek yang
  * menuntut cookie sesi; memintanya dari konteks peramban membawa cookie itu
  * tanpa perlu menyalinnya ke mana pun.
  *
- * Menerima ALAMAT gambar (string), bukan locator: alamat ditangkap pada saat
- * deteksi, sehingga unduhan tidak bergantung pada elemen DOM yang mungkin
- * sudah di-render ulang oleh Gemini.
+ * Menerima HASIL deteksi (alamat + selector + indeks), bukan locator:
+ * alamat ditangkap pada saat deteksi, sehingga unduhan tidak bergantung
+ * pada elemen DOM yang mungkin sudah di-render ulang oleh Gemini.
  *
- * @param {{ src: string, width: number, height: number }} found
+ * @param {{ selector: string, index: number, src: string, width: number, height: number }} found
  * @param {JobDependencies & { imageCountBefore: number }} context
  * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
  */
 async function downloadImage(found, context) {
-  const { page } = context;
+  const { page, log } = context;
 
   const inline = inlineDataUrl(found.src);
-  if (inline !== null) return inline;
+  if (inline !== null) {
+    log(`Unduh via data-url: ${inline.bytes.byteLength} bita.`);
+    return inline;
+  }
 
-  const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 2_000);
+  const fetched = await fetchViaPage(found.src, page).catch(() => null);
+  if (fetched !== null && fetched.bytes.byteLength > 0) {
+    log(`Unduh via fetch halaman: ${fetched.bytes.byteLength} bita (${fetched.mimeType}).`);
+    return fetched;
+  }
+
+  const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 3_000);
   if (downloadButton !== null) {
     try {
       const [download] = await Promise.all([
-        page.waitForEvent("download", { timeout: 8_000 }),
+        page.waitForEvent("download", { timeout: 10_000 }),
         downloadButton.click(),
       ]);
       const stream = await download.createReadStream();
@@ -388,14 +427,19 @@ async function downloadImage(found, context) {
       }
       const bytes = concat(chunks);
       if (bytes.byteLength > 0) {
-        return { bytes, mimeType: mimeFromBytes(bytes) };
+        const result = { bytes, mimeType: mimeFromBytes(bytes) };
+        log(`Unduh via tombol unduh: ${result.bytes.byteLength} bita (${result.mimeType}).`);
+        return result;
       }
     } catch {
       // Tombol unduh tidak membawa hasil. Jatuh ke jalur berikutnya.
     }
   }
 
-  return fetchViaPage(found.src, page);
+  const shot = await screenshotImage(found, page, log).catch(() => null);
+  if (shot !== null) return shot;
+
+  return null;
 }
 
 /**
@@ -443,6 +487,31 @@ async function fetchViaPage(source, page) {
 
   const bytes = new Uint8Array(Buffer.from(encoded, "base64"));
   return bytes.byteLength > 0 ? { bytes, mimeType: mimeFromBytes(bytes) } : null;
+}
+
+/**
+ * Tangkapan layar elemen gambar hasil sebagai PNG.
+ *
+ * Jalur terakhir bila ketiga jalur unduhan gagal: piksel yang terlihat di
+ * layar adalah gambar hasil itu sendiri. Locator dicari ulang dari selector
+ * dan indeks yang ditangkap saat deteksi, lalu elemennya difoto langsung.
+ * Hasilnya SELALU gambar yang tampil di layar (gambar hasil Gemini), tidak
+ * pernah foto input — karena selectornya hanya `generated-image`.
+ *
+ * @param {{ selector: string, index: number }} found
+ * @param {import("@playwright/test").Page} page
+ * @param {(line: string) => void} log
+ * @returns {Promise<{ bytes: Uint8Array, mimeType: string } | null>}
+ */
+async function screenshotImage(found, page, log) {
+  const target = page.locator(found.selector).nth(found.index);
+  await target.scrollIntoViewIfNeeded().catch(() => undefined);
+  const buffer = await target.screenshot({ timeout: 10_000 }).catch(() => null);
+  if (buffer === null || buffer.byteLength < 1024) return null;
+
+  const bytes = new Uint8Array(buffer);
+  log(`Unduh via tangkapan layar: ${bytes.byteLength} bita (image/png).`);
+  return { bytes, mimeType: "image/png" };
 }
 
 /**
