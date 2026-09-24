@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildCopyPrompt, parseCopyResponse } from "./providers-impl";
+import { buildCopyPrompt, extractChatText, parseCopyResponse } from "./providers-impl";
 import { buildImagePrompt, parseImagePayload } from "./payload";
 import { parseJobMessage, processJob, type ConsumerDependencies } from "./consumer";
 
@@ -319,6 +319,43 @@ describe("parseCopyResponse", () => {
     });
 
     expect(parseCopyResponse(raw)?.specs).toEqual(["kulit sapi", "jahitan tangan"]);
+  });
+});
+
+describe("extractChatText", () => {
+  it("membaca badan JSON murni", () => {
+    // TC-U-JOB-19
+    const raw = JSON.stringify({ choices: [{ message: { content: "Halo dunia" } }] });
+
+    expect(extractChatText(raw)).toBe("Halo dunia");
+  });
+
+  it("menggabungkan potongan delta dari aliran SSE", () => {
+    // TC-U-JOB-19. Model ag/gemini-3.8-flash-high menjawab dalam bentuk
+    // SSE; parser yang hanya bisa JSON membuang balasan yang sah.
+    const raw = [
+      'data: {"choices":[{"delta":{"content":"Lampu "}}]}',
+      'data: {"choices":[{"delta":{"content":"bambu"}}]}',
+      "data: [DONE]",
+      "",
+    ].join("\n");
+
+    expect(extractChatText(raw)).toBe("Lampu bambu");
+  });
+
+  it("membaca pesan lengkap di dalam potongan SSE", () => {
+    // TC-U-JOB-19
+    const raw = 'data: {"choices":[{"message":{"content":"Vas dekoratif"}}]}\ndata: [DONE]\n';
+
+    expect(extractChatText(raw)).toBe("Vas dekoratif");
+  });
+
+  it("menolak badan kosong dan sampah", () => {
+    // TC-U-JOB-19
+    expect(extractChatText("")).toBeNull();
+    expect(extractChatText("   ")).toBeNull();
+    expect(extractChatText("data: [DONE]\n")).toBeNull();
+    expect(extractChatText("Gateway Timeout")).toBeNull();
   });
 });
 

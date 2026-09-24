@@ -91,6 +91,7 @@ export {
   createWorkersAiTextProvider,
   createWorkersAiTranscriptionProvider,
   createCacheImageProvider,
+  extractChatText,
   parseCopyResponse,
 } from "./providers-impl";
 

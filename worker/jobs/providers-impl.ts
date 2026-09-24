@@ -389,15 +389,15 @@ export interface NineRouterOptions {
   readonly apiKey: string;
   readonly baseUrl: string;
   /**
-   * Model teks di proksi 9router. Bawaan yang terbukti bekerja lewat proksi
-   * lokal; diganti lewat `NINEROUTER_TEXT_MODEL` tanpa mengubah kode.
-   * Catatan: `ag/gemini-3.8-flash*` diuji September 2026 dan TIDAK menjawab
-   * lewat proksi ini (404/kosong) — jangan memakainya sebelum diuji ulang.
+   * Model teks di proksi 9router. Bawaan `ag/gemini-3.8-flash-high` —
+   * terverifikasi September 2026 menjawab lewat proksi lokal dalam bentuk
+   * SSE dan menghasilkan copywriting yang lebih kreatif. Diganti lewat
+   * `NINEROUTER_TEXT_MODEL` tanpa mengubah kode.
    */
   readonly model?: string | undefined;
 }
 
-export const DEFAULT_NINEROUTER_TEXT_MODEL = "ba/glm-5.3-flash";
+export const DEFAULT_NINEROUTER_TEXT_MODEL = "ag/gemini-3.8-flash-high";
 
 /** Bentuk yang diminta dari model teks. Divalidasi ulang oleh pemanggil. */
 interface GeneratedCopy {
@@ -586,9 +586,7 @@ export function createNineRouterTextProvider(options: NineRouterOptions) {
         }
 
         const raw = await response.text();
-        const cleaned = raw.replace(/data:\s*\[DONE\][\s\r\n]*$/, "").trim();
-        const body: unknown = JSON.parse(cleaned);
-        const content = readChoiceContent(body);
+        const content = extractChatText(raw);
         const parsed = content === null ? null : parseCopyResponse(content);
 
         if (parsed === null) {
@@ -607,17 +605,55 @@ function readChoiceContent(body: unknown): string | null {
   const choices = (body as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || choices.length === 0) return null;
 
-  const message = (choices[0] as { message?: unknown }).message;
-  if (typeof message !== "object" || message === null) return null;
-
-  const msg = message as { content?: unknown; reasoning_content?: unknown };
-  if (typeof msg.content === "string" && msg.content.trim().length > 0) {
-    return msg.content;
-  }
-  if (typeof msg.reasoning_content === "string" && msg.reasoning_content.trim().length > 0) {
-    return msg.reasoning_content;
+  const first = choices[0] as { message?: unknown; delta?: unknown };
+  for (const part of [first.message, first.delta]) {
+    if (typeof part !== "object" || part === null) continue;
+    const msg = part as { content?: unknown; reasoning_content?: unknown };
+    if (typeof msg.content === "string" && msg.content.trim().length > 0) {
+      return msg.content;
+    }
+    if (typeof msg.reasoning_content === "string" && msg.reasoning_content.trim().length > 0) {
+      return msg.reasoning_content;
+    }
   }
   return null;
+}
+
+/**
+ * Mengambil teks balasan dari badan respons chat OpenAI-compatible.
+ *
+ * Dua bentuk didukung karena proksi 9router mengembalikan keduanya
+ * tergantung model: JSON murni (`{choices:[...]}`) atau aliran SSE
+ * (baris-baris `data: {...}` diakhiri `data: [DONE]`). Model
+ * `ag/gemini-3.8-flash-high` menjawab dalam bentuk SSE — parser yang hanya
+ * bisa JSON akan membuang balasan yang sebenarnya sah.
+ */
+export function extractChatText(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    return readChoiceContent(JSON.parse(trimmed));
+  } catch {
+    // Bukan JSON murni — coba sebagai SSE di bawah.
+  }
+
+  const parts: string[] = [];
+  for (const line of trimmed.split("\n")) {
+    const text = line.trim();
+    if (!text.startsWith("data:")) continue;
+    const payload = text.slice(5).trim();
+    if (payload === "[DONE]" || payload.length === 0) continue;
+    try {
+      const content = readChoiceContent(JSON.parse(payload));
+      if (content !== null) parts.push(content);
+    } catch {
+      // Baris rusak dilewati; baris lain tetap dipakai.
+    }
+  }
+
+  const joined = parts.join("");
+  return joined.trim().length > 0 ? joined : null;
 }
 
 // --- Teks: Workers AI ---

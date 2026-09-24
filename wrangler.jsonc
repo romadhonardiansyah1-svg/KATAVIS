@@ -55,7 +55,7 @@
     "DEMO_MODE": "false",
     "GEMINI_TIMEOUT_MS": "65000",
     "AGENT_HEARTBEAT_TIMEOUT_MS": "30000",
-    "NINEROUTER_TEXT_MODEL": "ba/glm-5.3-flash"
+    "NINEROUTER_TEXT_MODEL": "ag/gemini-3.8-flash-high"
   }
 
   // Rahasia diatur lewat `wrangler secret put`, tidak pernah di berkas ini:

@@ -103,6 +103,7 @@ import {
 } from "./db";
 import { buildExport, type ExportProduct } from "./export";
 import {
+  DEFAULT_NINEROUTER_TEXT_MODEL,
   WORKERS_AI_TEXT_MODEL,
   canRetryJob,
   d1ClaimImageJobs,
@@ -114,6 +115,7 @@ import {
   d1RetryJob,
   d1ReturnJobToQueue,
   d1UpsertHeartbeat,
+  extractChatText,
   latestJobs,
   overallProgress,
   parseJobMessage,
@@ -177,7 +179,7 @@ export interface Env {
   GROQ_API_KEY?: string;
   NINEROUTER_API_KEY?: string;
   NINEROUTER_BASE_URL?: string;
-  /** Model teks 9router. Bawaan `ba/glm-5.3-flash` bila kosong. */
+  /** Model teks 9router. Bawaan `ag/gemini-3.8-flash-high` bila kosong. */
   NINEROUTER_TEXT_MODEL?: string;
   AGENT_SHARED_KEY?: string;
   JWT_SIGNING_KEY?: string;
@@ -1036,7 +1038,7 @@ async function sharpenStudioPrompt(env: Env, instruction: string): Promise<strin
         : fetchChatText(
             `${env.NINEROUTER_BASE_URL.replace(/\/+$/, "")}/chat/completions`,
             env.NINEROUTER_API_KEY,
-            env.NINEROUTER_TEXT_MODEL ?? "ba/glm-5.3-flash",
+            env.NINEROUTER_TEXT_MODEL ?? DEFAULT_NINEROUTER_TEXT_MODEL,
             instruction,
           ),
     () => fetchWorkersAiText(env, instruction),
@@ -1091,29 +1093,7 @@ async function fetchChatText(
   if (!response.ok) return null;
 
   const raw = await response.text();
-  const cleaned = raw.replace(/data:\s*\[DONE\][\s\r\n]*$/, "").trim();
-
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(cleaned);
-  } catch {
-    return null;
-  }
-
-  if (typeof decoded !== "object" || decoded === null) return null;
-  const choices = (decoded as { choices?: unknown }).choices;
-  if (!Array.isArray(choices) || choices.length === 0) return null;
-  const message = (choices[0] as { message?: unknown }).message;
-  if (typeof message !== "object" || message === null) return null;
-
-  const record = message as { content?: unknown; reasoning_content?: unknown };
-  if (typeof record.content === "string" && record.content.trim().length > 0) {
-    return record.content;
-  }
-  if (typeof record.reasoning_content === "string" && record.reasoning_content.trim().length > 0) {
-    return record.reasoning_content;
-  }
-  return null;
+  return extractChatText(raw);
 }
 
 /** Teks mentah dari Workers AI untuk penajaman prompt. */
