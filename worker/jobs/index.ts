@@ -82,6 +82,7 @@ export type { ConsumerDependencies, ConsumerEnv, JobMessage, JobOutcome } from "
 // Penyedia AI konkret. Bentuknya di `providers.ts`, implementasinya di sini.
 export {
   buildCopyPrompt,
+  createGroqTextProvider,
   createGroqTranscriptionProvider,
   createNineRouterTextProvider,
   createWorkersAiImageProvider,

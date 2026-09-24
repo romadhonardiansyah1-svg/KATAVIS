@@ -43,6 +43,7 @@ import {
 import { imageChainSteps, runProviderChain, textChainSteps, transcriptionChainSteps } from "./chain";
 import { buildImagePrompt } from "./payload";
 import {
+  createGroqTextProvider,
   createGroqTranscriptionProvider,
   createNineRouterTextProvider,
   createWorkersAiImageProvider,
@@ -264,6 +265,23 @@ async function processImageJob(
   const cached = await useCachedImage(context, dependencies);
   if (cached) return { status: "succeeded" };
 
+  // Fallback jaring pengaman: jika model studio gagal, pertahankan foto asli pengrajin (AGENTS.md aturan 7)
+  if (context.sourceKey !== null) {
+    const head = await env.MEDIA.head(context.sourceKey);
+    if (head !== null) {
+      await recordImageResult(
+        context,
+        { mediaId: ulid(), r2Key: context.sourceKey },
+        head.httpMetadata?.contentType ?? "image/jpeg",
+        head.size,
+        "original",
+        dependencies,
+      );
+      log(`Pekerjaan gambar ${context.id} mempertahankan foto asli ${context.sourceKey}.`);
+      return { status: "succeeded" };
+    }
+  }
+
   await d1FailJob(env.DB, context.id, "IMAGE_GENERATE_FAILED", nowMs);
   return { status: "failed", code: "IMAGE_GENERATE_FAILED" };
 }
@@ -421,6 +439,9 @@ async function processCopyJob(
   const locale = (context.locale ?? "id") as Locale;
 
   const providers = [
+    ...(env.GROQ_API_KEY !== undefined
+      ? [createGroqTextProvider({ apiKey: env.GROQ_API_KEY })]
+      : []),
     ...(env.NINEROUTER_API_KEY !== undefined && env.NINEROUTER_BASE_URL !== undefined
       ? [
           createNineRouterTextProvider({

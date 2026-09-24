@@ -469,6 +469,75 @@ export function buildCopyPrompt(transcript: string, locale: string): string {
   ].join("\n");
 }
 
+export interface GroqTextOptions {
+  readonly apiKey: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+}
+
+/**
+ * Lapis teks tercepat lewat Groq.
+ * Menghasilkan naskah katalog dalam format JSON dalam ~1,3 detik.
+ */
+export function createGroqTextProvider(options: GroqTextOptions) {
+  const baseUrl = options.baseUrl ?? GROQ_DEFAULT_BASE_URL;
+  const model = options.model ?? "openai/gpt-oss-120b";
+
+  return {
+    id: "groq" as const,
+    timeoutMs: TEXT_TIMEOUT_MS,
+
+    async generate(request: {
+      readonly transcript: string;
+      readonly locale: string;
+      readonly signal: AbortSignal;
+    }): Promise<Content> {
+      const startedAt = Date.now();
+
+      return guard("groq", request.signal, async () => {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${options.apiKey}`,
+            "User-Agent": "KATAVIS/1.0",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a professional Indonesian craft catalog writer. Always respond with pure valid JSON only.",
+              },
+              { role: "user", content: buildCopyPrompt(request.transcript, request.locale) },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+          }),
+          signal: request.signal,
+        });
+
+        if (!response.ok) {
+          throw new ProviderError(response.status, `groq: permintaan teks ditolak (${response.status}).`);
+        }
+
+        const raw = await response.text();
+        const cleaned = raw.replace(/data:\s*\[DONE\][\s\r\n]*$/, "").trim();
+        const body: unknown = JSON.parse(cleaned);
+        const content = readChoiceContent(body);
+        const parsed = content === null ? null : parseCopyResponse(content);
+
+        if (parsed === null) {
+          throw new ProviderError(502, "groq: balasan teks bukan JSON yang dapat dibaca.");
+        }
+
+        return { ...parsed, provider: "groq" as const, durationMs: Date.now() - startedAt };
+      });
+    },
+  };
+}
+
 /**
  * Lapis 1 rantai teks.
  *
@@ -496,9 +565,8 @@ export function createNineRouterTextProvider(options: NineRouterOptions) {
             Authorization: `Bearer ${options.apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: "ba/glm-5.3-flash",
             messages: [{ role: "user", content: buildCopyPrompt(request.transcript, request.locale) }],
-            response_format: { type: "json_object" },
             temperature: 0.4,
           }),
           signal: request.signal,
@@ -508,7 +576,9 @@ export function createNineRouterTextProvider(options: NineRouterOptions) {
           throw new ProviderError(response.status, `9router: permintaan ditolak (${response.status}).`);
         }
 
-        const body: unknown = await response.json();
+        const raw = await response.text();
+        const cleaned = raw.replace(/data:\s*\[DONE\][\s\r\n]*$/, "").trim();
+        const body: unknown = JSON.parse(cleaned);
         const content = readChoiceContent(body);
         const parsed = content === null ? null : parseCopyResponse(content);
 
@@ -531,8 +601,14 @@ function readChoiceContent(body: unknown): string | null {
   const message = (choices[0] as { message?: unknown }).message;
   if (typeof message !== "object" || message === null) return null;
 
-  const content = (message as { content?: unknown }).content;
-  return typeof content === "string" ? content : null;
+  const msg = message as { content?: unknown; reasoning_content?: unknown };
+  if (typeof msg.content === "string" && msg.content.trim().length > 0) {
+    return msg.content;
+  }
+  if (typeof msg.reasoning_content === "string" && msg.reasoning_content.trim().length > 0) {
+    return msg.reasoning_content;
+  }
+  return null;
 }
 
 // --- Teks: Workers AI ---

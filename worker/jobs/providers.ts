@@ -23,6 +23,7 @@ export type ProviderId =
   | "gemini_web"
   | "workers_ai"
   | "cache"
+  | "original"
   | "groq"
   | "9router";
 
