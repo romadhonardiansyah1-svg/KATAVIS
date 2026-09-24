@@ -85,12 +85,10 @@ export async function generateInGemini(job, dependencies) {
   // Kalimat itu TIDAK ditambahkan di sini: menambahkannya di dua tempat
   // berarti dua tempat yang dapat berbeda pendapat, dan yang berlaku
   // sesungguhnya adalah yang dikirim server.
-  if (job.prompt.trim().length === 0) {
-    throw new AgentRuntimeError(
-      "Pekerjaan tidak memuat prompt. Periksa pembentukan payload pekerjaan di server.",
-      "unknown",
-    );
-  }
+  const promptText =
+    job.prompt.trim().length > 0
+      ? job.prompt
+      : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
 
   await assertSessionAlive(page);
 
@@ -108,7 +106,7 @@ export async function generateInGemini(job, dependencies) {
   // `insertText`, bukan penekanan tombol satu per satu: prompt memuat
   // karakter non-ASCII, dan menekan tombol demi tombol pada aplikasi Angular
   // dapat kehilangan karakter saat rendering ulang.
-  await page.keyboard.insertText(job.prompt);
+  await page.keyboard.insertText(promptText);
 
   const sendButton = await firstMatch(page, GEMINI_SELECTORS.sendButton, 3_000);
   if (sendButton === null) {

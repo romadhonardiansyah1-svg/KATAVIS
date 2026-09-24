@@ -498,10 +498,20 @@ export async function requestGeneration(
     const id = ulid();
     jobs.push({ id, kind: entry.kind, status: "queued" });
 
+    const payload =
+      entry.kind === "image"
+        ? JSON.stringify({
+            style: parsed.data.imageStyle ?? "studio",
+            prompt: `Buat foto produk studio profesional dari foto produk kerajinan ini dengan gaya ${
+              parsed.data.imageStyle ?? "studio"
+            }. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.`,
+          })
+        : null;
+
     return {
-      query: `INSERT INTO jobs (id, product_id, kind, status, locale, attempt, progress, created_at)
-              VALUES (?, ?, ?, 'queued', ?, 0, 0, ?)`,
-      params: [id, productId, entry.kind, entry.locale, nowMs],
+      query: `INSERT INTO jobs (id, product_id, kind, status, locale, attempt, progress, payload, created_at)
+              VALUES (?, ?, ?, 'queued', ?, 0, 0, ?, ?)`,
+      params: [id, productId, entry.kind, entry.locale, payload, nowMs],
     };
   });
 

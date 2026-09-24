@@ -9,6 +9,7 @@
  */
 
 import { d1ListJobs, type JobRecord } from "./d1-jobs";
+import { buildImagePrompt } from "./payload";
 
 export interface AgentHeartbeat {
   readonly agentId: string;
@@ -126,6 +127,8 @@ export async function d1ClaimImageJobs(
        WHERE id IN (
          SELECT id FROM jobs
          WHERE kind = 'image' AND status = 'queued'
+           AND (provider IS NULL OR provider != 'workers_ai')
+           AND attempt < 3
          ORDER BY created_at
          LIMIT ?
        )
