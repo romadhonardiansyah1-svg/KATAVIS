@@ -369,7 +369,10 @@ describe("catalog — permintaan pemrosesan", () => {
     };
     expect(payload.style).toBe("dark_gradient");
     expect(payload.prompt).toContain("kulit kerbau");
-    expect(payload.prompt).toContain("SATU-SATUNYA objek");
+    // Prompt server adalah arah kreatif murni; bingkai "edit lampiran" dan
+    // aturan pelestarian ditambahkan agen (satu sumber, anti prompt ganda).
+    expect(payload.prompt).not.toContain("saya lampirkan");
+    expect(payload.prompt).not.toContain("SATU-SATUNYA objek");
   });
 
   it("memajukan draft menjadi processing dalam putaran yang sama", async () => {

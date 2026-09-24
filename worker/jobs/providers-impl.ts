@@ -478,8 +478,11 @@ export function buildCopyPrompt(transcript: string, locale: string): string {
     "Bila suatu hal tidak disebut, jangan tuliskan hal itu.",
     "Balas HANYA dengan JSON tanpa penjelasan lain, berbentuk:",
     '{"name":"...","story":"...","specs":["..."],"socialCopy":"...","seoKeywords":["..."]}',
-    "name maksimal 120 karakter. story 2-4 kalimat yang hangat dan apa adanya.",
-    "specs diisi hanya dari yang disebut pengrajin. socialCopy satu kalimat untuk media sosial.",
+    "name maksimal 120 karakter. story 80-150 kata yang hangat, naratif, dan apa adanya: " +
+      "siapa yang membuat, dari apa, bagaimana prosesnya, dan kenapa produk ini istimewa.",
+    "specs 3-6 butir HANYA dari yang disebut pengrajin; bila transkrip hanya menyebut satu hal, " +
+      "cukup satu spesifikasi — jangan mengarang sisanya.",
+    "socialCopy satu-dua kalimat untuk media sosial.",
   ].join("\n");
 }
 

@@ -50,6 +50,10 @@ export default function ReviewPage(): React.JSX.Element {
   const { draft, savedAt, isSaving, update, goTo } = useCreateFlow("review");
   const [content, setContent] = useState<EditableContent | null>(null);
   const [otherLocales, setOtherLocales] = useState<readonly string[]>([]);
+  const [photoOriginal, setPhotoOriginal] = useState<string | null>(null);
+  const [photoStudio, setPhotoStudio] = useState<string | null>(null);
+  const [socialCopy, setSocialCopy] = useState<string | null>(null);
+  const [seoKeywords, setSeoKeywords] = useState<readonly string[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<StepError | null>(null);
   const loadedRef = useRef(false);
@@ -77,14 +81,21 @@ export default function ReviewPage(): React.JSX.Element {
       setOtherLocales(
         Object.keys(result.data.content).filter((locale) => locale !== SOURCE_LOCALE),
       );
+      const source = result.data.content[SOURCE_LOCALE];
+      setSocialCopy(source?.socialCopy ?? null);
+      setSeoKeywords(source?.seoKeywords ?? []);
+      const original = result.data.media.find((item) => item.kind === "photo_original");
+      const studio =
+        result.data.media.find((item) => item.kind === "photo_studio" && item.isPrimary) ??
+        result.data.media.find((item) => item.kind === "photo_studio");
+      setPhotoOriginal(original?.url ?? null);
+      setPhotoStudio(studio?.url ?? null);
     })();
   }, [productId]);
 
   if (draft === null) return <StepLoading />;
 
-  const ready = content !== null;
-
-  async function confirm(): Promise<void> {
+  const ready = content !== null;  async function confirm(): Promise<void> {
     const token = readAccessToken();
     if (token === null || productId === null || content === null) {
       setError(messageOf("UNAUTHENTICATED"));
@@ -139,6 +150,32 @@ export default function ReviewPage(): React.JSX.Element {
       {ready ? (
         <>
           <div className={styles.field}>
+            <p className={styles.label}>Foto produk</p>
+            <div className={styles.photoFrame}>
+              {photoStudio !== null ? (
+                <img
+                  className={styles.photoImage}
+                  src={photoStudio}
+                  alt="Foto studio produk Anda"
+                />
+              ) : photoOriginal !== null ? (
+                <img
+                  className={styles.photoImage}
+                  src={photoOriginal}
+                  alt="Foto asli produk Anda"
+                />
+              ) : (
+                <DocumentIcon size={48} />
+              )}
+            </div>
+            <p className={styles.hint}>
+              {photoStudio !== null
+                ? "Foto studio hasil AI. Bandingkan dengan foto asli di Langkah 1."
+                : "Foto studio belum tersedia — yang tampil foto asli Anda. Foto asli tidak pernah hilang."}
+            </p>
+          </div>
+
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="name">
               Nama produk
             </label>
@@ -192,6 +229,17 @@ export default function ReviewPage(): React.JSX.Element {
               </span>
               Juga tersedia dalam: {otherLocales.join(", ")}
             </p>
+          ) : null}
+
+          {socialCopy !== null && socialCopy.length > 0 ? (
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>Caption media sosial</h2>
+              <p>{socialCopy}</p>
+            </div>
+          ) : null}
+
+          {seoKeywords.length > 0 ? (
+            <p className={styles.hint}>Kata kunci: {seoKeywords.join(", ")}</p>
           ) : null}
         </>
       ) : (

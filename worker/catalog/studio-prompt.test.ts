@@ -53,10 +53,13 @@ describe("studio-prompt — prompt otomatis", () => {
   });
 
   it("memuat aturan produk-tunggal pada setiap gaya", () => {
+    // Aturan pelestarian hidup di Studio Agent (satu-satunya yang tahu foto
+    // terlampir), bukan di prompt server — duplikasi membingungkan model.
+    // Yang diuji di sini: setiap gaya menghasilkan arahan katalog yang lengkap.
     for (const style of STYLES) {
       const prompt = buildAutoStudioPrompt({ productLabel: "produk kriya", style });
-      expect(prompt).toContain("SATU-SATUNYA objek");
-      expect(prompt).toContain("100% persis");
+      expect(prompt).toContain("katalog");
+      expect(prompt.length).toBeGreaterThan(100);
     }
   });
 

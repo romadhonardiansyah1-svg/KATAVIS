@@ -26,13 +26,6 @@ export interface StudioPromptInput {
   readonly style: ImageStyle;
 }
 
-const PRODUCT_RULES =
-  "Produk utama adalah SATU-SATUNYA objek di foto hasil. " +
-  "Hapus semua objek lain, tangan, kemasan berlebih, atau gangguan di sekitar produk. " +
-  "Pertahankan produk 100% persis seperti di foto lampiran: bentuk, warna, " +
-  "tekstur bahan, ukuran relatif, dan seluruh detailnya. " +
-  "Tanpa teks, tanpa watermark, tanpa objek tambahan.";
-
 const STYLE_DIRECTIONS: Record<ImageStyle, { readonly scene: string }> = {
   marble_light: {
     scene:
@@ -81,17 +74,18 @@ export function styleDirection(style: ImageStyle): string {
 }
 
 /**
- * Prompt otomatis: berbeda untuk setiap produk karena memuat label produk
- * dan gaya yang dipilih. Dua produk tidak pernah mendapat prompt yang sama
- * persis kecuali transkrip dan gayanya sama persis.
+ * Prompt otomatis: ARAH KREATIF MURNI, bukan prompt final.
+ *
+ * Aturan pelestarian produk ("satu-satunya objek", "100% persis") TIDAK ada
+ * di sini — ia ditambahkan Studio Agent karena hanya agen yang tahu foto
+ * benar-benar terlampir. Menaruhnya di dua tempat menghasilkan prompt ganda
+ * yang membingungkan model ("Edit foto ... Arah kreatif: Edit foto ...").
  */
 export function buildAutoStudioPrompt(input: StudioPromptInput): string {
   return (
-    `Edit foto produk yang saya lampirkan menjadi foto katalog komersial studio ` +
-    `yang menarik dan estetik untuk ${input.productLabel}. ` +
+    `Foto katalog komersial studio yang menarik dan estetik untuk ${input.productLabel}. ` +
     `${styleDirection(input.style)} ` +
-    `Gaya fotografi katalog pameran seni kriya internasional: tajam, hidup, dan menjual. ` +
-    PRODUCT_RULES
+    `Gaya fotografi katalog pameran seni kriya internasional: tajam, hidup, dan menjual.`
   );
 }
 
@@ -117,9 +111,9 @@ export function buildSharpenInstruction(
     `Produk: ${productLabel}\n` +
     `Arah gaya dasar: ${styleDirection(style)}\n\n` +
     `Prompt wajib memuat: deskripsi penataan produk yang spesifik (bukan ` +
-    `"latar bersih" yang generik), jenis permukaan dan pencahayaan yang ` +
-    `konkret, dan aturan bahwa produk adalah satu-satunya objek dan harus ` +
-    `dipertahankan 100% persis.`
+    `"latar bersih" yang generik) serta jenis permukaan dan pencahayaan yang ` +
+    `konkret. Jangan menulis aturan pelestarian produk — aturan itu ` +
+    `ditambahkan pengirim saat foto dilampirkan.`
   );
 }
 

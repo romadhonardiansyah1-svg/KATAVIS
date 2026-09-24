@@ -97,6 +97,7 @@ export async function generateInGemini(job, dependencies) {
   // sesungguhnya adalah yang dikirim server.
   let tempFile = null;
   let attachedBytes = 0;
+  let attached = false;
   try {
     const imageBytes = await dependencies.client.getBinary(`/agent/jobs/${job.id}/source-image`);
     if (imageBytes !== null && imageBytes.byteLength > 0) {
@@ -110,34 +111,53 @@ export async function generateInGemini(job, dependencies) {
         .count()
         .catch(() => 0);
       log("Melampirkan foto asli produk ke Gemini web...");
-      let fileInput = page.locator('input[type="file"]').first();
-      if ((await fileInput.count()) === 0) {
-        const uploadBtn = page
-          .locator('button[aria-label*="Upload" i], button[aria-label*="Unggah" i], button[aria-label*="tambah" i]')
-          .first();
-        if ((await uploadBtn.count()) > 0) {
-          await uploadBtn.click();
-          await page.waitForTimeout(600);
+
+      // Jalur utama: tangkap dialog berkas dari tombol unggah. Ini menjamin
+      // berkas masuk ke input yang benar — menebak di antara beberapa
+      // `input[type="file"]` tersembunyi sering salah sasaran.
+      const uploadBtn = page
+        .locator('button[aria-label*="Upload" i], button[aria-label*="Unggah" i]')
+        .first();
+      if ((await uploadBtn.count()) > 0) {
+        try {
+          const [chooser] = await Promise.all([
+            page.waitForEvent("filechooser", { timeout: 5_000 }),
+            uploadBtn.click(),
+          ]);
+          await chooser.setFiles(tempFile);
+        } catch {
+          // Tombol tidak membuka dialog (misal menu yang harus dipilih
+          // dulu). Jatuh ke jalur input langsung di bawah.
         }
       }
-      fileInput = page.locator('input[type="file"]').first();
-      if ((await fileInput.count()) > 0) {
-        await fileInput.setInputFiles(tempFile);
-        await page.waitForTimeout(2500);
-        const blobsAfter = await page
-          .locator('img[src^="blob:"]')
-          .count()
-          .catch(() => blobsBefore);
-        if (blobsAfter > blobsBefore) {
-          log(`Foto asli produk berhasil dilampirkan ke Gemini (pratinjau tampil).`);
-        } else {
-          log(
-            "Peringatan: pratinjau lampiran tidak terdeteksi di chat. " +
-              "Foto mungkin tetap terlampir; melanjutkan dengan prompt teks.",
-          );
+
+      // Jalur cadangan: isi input berkas langsung.
+      let fileInput = page.locator('input[type="file"]').first();
+      if ((await fileInput.count()) === 0) {
+        const moreBtn = page.locator('button[aria-label*="tambah" i]').first();
+        if ((await moreBtn.count()) > 0) {
+          await moreBtn.click();
+          await page.waitForTimeout(600);
         }
+        fileInput = page.locator('input[type="file"]').first();
+      }
+      if ((await fileInput.count()) > 0) {
+        await fileInput.setInputFiles(tempFile).catch(() => undefined);
+      }
+
+      await page.waitForTimeout(2500);
+      const blobsAfter = await page
+        .locator('img[src^="blob:"]')
+        .count()
+        .catch(() => blobsBefore);
+      attached = blobsAfter > blobsBefore;
+      if (attached) {
+        log(`Foto asli produk berhasil dilampirkan ke Gemini (pratinjau tampil).`);
       } else {
-        log("Peringatan: kolom unggah berkas tidak ditemukan. Melanjutkan dengan prompt teks.");
+        log(
+          "Peringatan: pratinjau lampiran tidak terdeteksi di chat. " +
+            "Foto mungkin tetap terlampir; melanjutkan dengan prompt teks.",
+        );
       }
     } else {
       log("Peringatan: foto asli tidak tersedia di server. Melanjutkan dengan prompt teks.");
@@ -147,12 +167,12 @@ export async function generateInGemini(job, dependencies) {
   }
 
   const serverPrompt = job.prompt.trim();
-  // Foto terlampir mengubah cara prompt dibaca: prompt server menjadi ARAH
-  // KREATIF (produk apa, gaya apa), sementara aturan pelestarian produk
-  // ditambahkan di sini karena hanya agen yang tahu foto berhasil ditempel.
-  // Tanpa foto, prompt server dipakai apa adanya.
+  // `attached` (pratinjau tampil), bukan sekadar berkas tertulis, yang
+  // menentukan bingkai prompt: aturan pelestarian hanya benar bila foto
+  // benar-benar ada di chat. Tanpa foto terverifikasi, prompt server dipakai
+  // apa adanya agar model tidak diperintah mengedit lampiran yang tak ada.
   const promptText =
-    tempFile !== null
+    attached
       ? `Edit foto produk yang saya lampirkan. Arah kreatif: ${serverPrompt.length > 0 ? serverPrompt : "foto katalog studio yang menarik dan estetik"}.
 
 ATURAN MUTLAK:

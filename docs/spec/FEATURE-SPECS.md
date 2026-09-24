@@ -139,14 +139,17 @@ Prompt final disusun per produk, bukan satu template untuk semua:
 3. **Agen** — saat foto terlampir di Gemini web, prompt server dipakai
    sebagai arah kreatif dan agen menambahkan aturan pelestarian produk.
 
-Contoh prompt otomatis (gaya Marmer Terang):
+Contoh prompt otomatis (gaya Marmer Terang) — arah kreatif murni:
 
 ```
-Edit foto produk yang saya lampirkan menjadi foto katalog komersial studio
-yang menarik dan estetik untuk produk: "pakan duckweed dan larva bsf".
-Produk difoto dari sudut tiga-perempat di atas meja marmer putih bersih ...
-Produk utama adalah SATU-SATUNYA objek di foto hasil ...
+Foto katalog komersial studio yang menarik dan estetik untuk produk:
+"pakan duckweed dan larva bsf". Produk difoto dari sudut tiga-perempat
+di atas meja marmer putih bersih ...
 ```
+
+Bingkai "Edit foto terlampir" dan aturan pelestarian produk ditambahkan
+Studio Agent (satu-satunya yang tahu foto benar-benar menempel), bukan di
+sini — duplikasi menghasilkan prompt ganda yang membingungkan model.
 
 ---
 
