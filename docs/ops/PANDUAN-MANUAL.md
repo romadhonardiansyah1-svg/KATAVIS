@@ -419,23 +419,15 @@ Terminal 3   pnpm run dev:agent       →  hanya bila butuh jalur Gemini
 
 HP dan laptop harus tersambung ke Wi-Fi yang **sama**.
 
-##### Jebakan yang harus diatasi lebih dulu: alamat API tertanam saat build
+##### Alamat Worker untuk HP
 
-`app/create/api.ts` baris 22 membaca alamat Worker dari `NEXT_PUBLIC_API_BASE_URL` dengan
-bawaan `http://localhost:8787`:
+`app/create/api.ts` mengutamakan `NEXT_PUBLIC_API_BASE_URL`. Bila tidak diisi, peramban
+memakai host halaman yang sedang dibuka dengan port `8787`. Jadi halaman
+`http://<IP-laptop>:3000` akan menghubungi Worker di `http://<IP-laptop>:8787`.
 
-```ts
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
-```
-
-Awalan `NEXT_PUBLIC_` berarti nilai itu **disisipkan ke bundel pada saat build**, bukan dibaca
-saat berjalan. Akibatnya, membuka `http://10.173.2.171:3000` dari HP akan memuat antarmukanya
-dengan benar, tetapi **setiap panggilan API menunjuk ke `localhost` milik HP itu sendiri** dan
-gagal. Gejalanya: halaman terbuka, lalu berhenti pada layar masuk atau menampilkan
-`NETWORK_OFFLINE`.
-
-Ini bukan cacat — untuk pengembangan laptop-saja, bawaan itu memang yang diinginkan. Tetapi
-**untuk akses dari HP, alamatnya harus diisi sebelum build.**
+Jika Worker berada di alamat lain, isi `NEXT_PUBLIC_API_BASE_URL` **sebelum build**.
+Next.js menyisipkan nilai `NEXT_PUBLIC_` ke bundel; perubahan setelah build tidak
+memperbarui alamat yang dipakai peramban.
 
 **Langkah 1 — cari alamat IP laptop.**
 
@@ -443,24 +435,30 @@ Ini bukan cacat — untuk pengembangan laptop-saja, bawaan itu memang yang diing
 ipconfig | grep -A2 "IPv4"
 ```
 
-Dari mesin ini, hasilnya: **`10.173.2.171`** (adaptor Wi-Fi). Abaikan `169.254.x.x` — itu alamat
+Gunakan alamat IPv4 Wi-Fi yang berlaku saat demo. Abaikan `169.254.x.x` — itu alamat
 tautan-lokal, tandanya adaptor tidak mendapat alamat sah.
 
 **Langkah 2 — tentukan alamat Worker yang akan dipakai HP.**
 
 | Cara menjalankan Worker | Nilai `NEXT_PUBLIC_API_BASE_URL` |
 |---|---|
-| `wrangler dev` lokal di laptop | `http://10.173.2.171:8787` |
+| `wrangler dev` lokal di laptop | Boleh kosong; otomatis memakai host halaman dan port `8787` |
 | Worker sudah diterapkan ke Cloudflare | `https://katavis.<subdomain>.workers.dev` |
 
-**Langkah 3 — buat berkas `.env.local`** di akar proyek (diabaikan git):
+**Langkah 3 — bila Worker berada di alamat lain, buat `.env.local`** di akar proyek
+(diabaikan git):
 
 ```
-NEXT_PUBLIC_API_BASE_URL=http://10.173.2.171:8787
-ALLOWED_ORIGINS=http://localhost:3000,http://10.173.2.171:3000
+NEXT_PUBLIC_API_BASE_URL=https://katavis.<subdomain>.workers.dev
 ```
 
-Baris kedua masuk ke `.dev.vars`, **bukan** `.env.local` — Worker yang membacanya. Tanpa itu,
+Untuk Worker lokal, masukkan asal halaman ke `.dev.vars` dengan IP laptop yang berlaku:
+
+```
+ALLOWED_ORIGINS=http://localhost:3000,http://<IP-laptop>:3000
+```
+
+Tanpa itu,
 `corsHeaders()` mengembalikan objek kosong untuk asal yang tidak terdaftar (TC-SEC-20), dan
 peramban menolak setiap permintaan lintas asal.
 
@@ -477,7 +475,7 @@ Terminal 2   pnpm exec next dev -H 0.0.0.0 -p 3000
 **Langkah 5 — buka dari HP.**
 
 ```
-http://10.173.2.171:3000
+http://<IP-laptop>:3000
 ```
 
 **Langkah 6 — bila HP tetap tidak dapat menjangkau.**
@@ -489,11 +487,12 @@ New-NetFirewallRule -DisplayName "KATAVIS dev 3000" -Direction Inbound -LocalPor
 New-NetFirewallRule -DisplayName "KATAVIS dev 8787" -Direction Inbound -LocalPort 8787 -Protocol TCP -Action Allow
 ```
 
-**Bila IP laptop berubah** (Wi-Fi baru, hotspot), ulangi Langkah 1 sampai 3 lalu nyalakan ulang
-`pnpm run dev`. Alamat `10.173.2.171` hanya berlaku untuk jaringan yang sedang dipakai sekarang.
+**Bila IP laptop berubah** (Wi-Fi baru, hotspot), ulangi Langkah 1, perbarui
+`ALLOWED_ORIGINS` di `.dev.vars`, lalu nyalakan ulang Worker. Bila Anda memakai
+`NEXT_PUBLIC_API_BASE_URL` berisi IP lama, perbarui juga nilai itu dan build ulang aplikasi.
 
 **Bila hanya ingin cepat melihat antarmuka tanpa API** — misalnya memeriksa tata letak di layar
-ponsel — Langkah 3 tidak diperlukan. Halaman akan tampil, hanya data-datanya yang kosong.
+ponsel — Worker tidak perlu dinyalakan. Halaman akan tampil, hanya data-datanya yang kosong.
 
 #### Pilihan B · Cloudflare Tunnel (lebih andal, butuh login Wrangler)
 

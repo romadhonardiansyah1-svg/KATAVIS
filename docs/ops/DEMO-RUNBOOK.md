@@ -10,7 +10,7 @@ Dokumen operasional untuk hari-H. Dibaca saat panik, jadi ditulis singkat dan be
 
 - [ ] Laptop terisi penuh, pengisi daya dibawa
 - [ ] Ponsel untuk hotspot, kuota diperiksa, baterai penuh
-- [ ] Ponsel Android kedua dengan APK terpasang untuk ditunjukkan
+- [ ] Ponsel Android kedua dengan PWA KATAVIS dibuka untuk ditunjukkan
 - [ ] Kabel HDMI dan adaptor USB-C ke HDMI
 - [ ] Produk kriya fisik untuk didemokan langsung
 - [ ] Pencahayaan sederhana untuk memotret produk di panggung
@@ -18,7 +18,7 @@ Dokumen operasional untuk hari-H. Dibaca saat panik, jadi ditulis singkat dan be
 ### Perangkat lunak
 
 - [ ] `git pull` dan build produksi berhasil
-- [ ] Worker dan Pages sudah diterapkan, URL publik dibuka dan berfungsi
+- [ ] Worker dan Next.js yang akan dipakai saat demo berjalan; buka tautan katalog pembeli dari perangkat demo
 - [ ] Studio Agent dijalankan, pemeriksaan kesehatan lolos
 - [ ] Chrome dengan profil Gemini sudah login, sesi diverifikasi
 - [ ] Cache aset demo terisi — buka setiap halaman demo sekali
@@ -57,11 +57,11 @@ Urutan ini dijalankan 30 menit sebelum giliran.
 
 ### Kalau harus masuk di panggung
 
-Kode OTP hanya muncul di log Worker, dan itu memang satu-satunya cara — penyedia SMS belum
-terpasang. Agar tidak mencarinya di depan juri:
+Penyedia SMS belum terpasang. Pada mode pengembangan lokal, kode demo `123456` diterima;
+di luar mode itu gunakan kode yang tercetak pada log Worker. Agar tidak mencarinya di depan juri:
 
 1. Buka ponsel pada nomor demo, tekan **Kirim kode**.
-2. Kode tercetak di terminal Worker sebagai `[demo] Kode OTP untuk +62...: 123456`.
+2. Pada demo lokal, masukkan `123456`. Pada lingkungan lain, baca kode dari terminal Worker.
 3. Perbesar terminal itu **sebelum** naik panggung, bukan saat mencarinya.
 
 Bila `/masuk` menolak nomor, periksa bentuknya: layar itu menerima `0812...`, `+62 812-...`, dan
@@ -82,8 +82,8 @@ per nomor per jam, dan batas itu terasa tepat saat demo berlangsung.
 | 0:00–0:45 | Masalah | Tiga hambatan dari proposal bagian 1.1. Tunjukkan foto produk asli yang gelap dan berlatar berantakan. |
 | 0:45–1:15 | Pengguna | Siapa pengrajin difabel dan pendamping SLB. Tanpa angka yang tidak terverifikasi. |
 | 1:15–4:30 | **Demo langsung** | Alur enam langkah dari awal sampai katalog terbit |
-| 4:30–5:15 | Aksesibilitas | Aktifkan Accessibility Mode profil Visual. Nyalakan screen reader. Tunjukkan navigasi suara. |
-| 5:15–6:00 | Hasil | Katalog publik dibuka dari ponsel juri lewat QR. Talking-Catalog berjalan. |
+| 4:30–5:15 | Aksesibilitas | Aktifkan profil Visual dan Motorik. Tunjukkan ukuran target, fokus keyboard, transkrip, dan subtitle. Jangan mengklaim Voice Navigation tersedia. |
+| 5:15–6:00 | Hasil | Buka tautan katalog pembeli. Gunakan ponsel/QR hanya sesudah alamat publik dan jaringan perangkat itu diuji. Tunjukkan subtitle; audio narasi publik belum tersedia. |
 | 6:00–6:45 | Arsitektur dan angka | INP, waktu total, biaya per katalog. Setiap angka dari pengukuran. |
 | 6:45–7:00 | Penutup | Posisi produk, peta jalan |
 
@@ -121,17 +121,16 @@ penjelasan rantai tiga lapis penyedia.
 1. Jangan panik dan jangan menjelaskan panjang. Katakan: "Jaringan venue terputus, saya pindah ke
    koneksi cadangan."
 2. Aktifkan hotspot ponsel. Sudah tersimpan di daftar jaringan, cukup satu klik.
-3. Bila tetap gagal dalam 15 detik, aktifkan `DEMO_MODE`. Halaman menampilkan penanda data cache.
-4. Katakan terus terang: "Ini data yang sudah di-cache. Alurnya sama, pemrosesan AI-nya tidak
-   berjalan sekarang."
+3. Bila tetap gagal dalam 15 detik, buka katalog hasil gladi bersih yang sudah terbit.
+4. Katakan terus terang bahwa ini hasil sebelumnya dan AI tidak sedang memproses.
 
 Jangan pernah berpura-pura data cache adalah hasil langsung. Bila juri menyadarinya, kerugiannya
 jauh lebih besar daripada mengakuinya.
 
 ### Gagal: generate gambar tidak selesai
 
-Tidak perlu tindakan. Fallback berjalan otomatis dalam 45 detik. Isi waktu dengan menjelaskan
-bahwa inilah rantai fallback yang barusan disebut.
+Tunggu sampai tahap gambar berubah menjadi selesai atau gagal. Bila gagal dan teks katalog sudah
+selesai, tekan **Lanjut dengan foto asli**. Tersedia juga **Coba lagi foto studio**.
 
 Bila ketiga lapis gagal, sistem menampilkan foto asli dengan pesan ramah. Katakan: "Generate gagal,
 dan sistem mempertahankan foto asli pengrajin. Karya pengguna tidak pernah hilang karena kegagalan
@@ -156,13 +155,13 @@ itu, pindah ke cadangan. Waktu presentasi lebih berharga daripada demo langsung 
 
 | Pertanyaan | Jawaban |
 |---|---|
-| "Layanan AI apa yang dipakai?" | Cloudflare Workers AI untuk gambar, Groq Whisper untuk transkripsi, 9router untuk teks. Sebutkan jalur produksi, bukan jalur eksperimental. |
+| "Layanan AI apa yang dipakai?" | Studio Agent memakai Gemini Web untuk gambar, dengan Workers AI sebagai cadangan. Groq dipakai untuk transkripsi dan teks; 9router/Workers AI menjadi cadangan teks. Sebutkan layanan yang benar-benar aktif pada demo. |
 | "Bagaimana mengukur latensi 300ms?" | Gunakan kalimat yang disiapkan di ADR-007. Tunjukkan grafik INP. |
 | "Kenapa tidak pakai SAM dan Stable Diffusion seperti proposal?" | GPU yang tersedia tanpa CUDA. Tunjukkan ADR-004. Menyimpang karena kendala terukur, bukan karena tidak dikerjakan. |
 | "Apakah benar-benar WCAG AAA?" | AA menyeluruh, AAA pada kontras dan ukuran target. Tunjukkan laporan axe-core dan tabel kontras terukur. |
-| "Bagaimana kalau pengrajin tidak bisa membaca sama sekali?" | Accessibility Mode profil Visual, TTS, dan Voice Navigation. Demokan langsung bila waktu cukup. |
-| "Berapa biaya per katalog?" | **Hanya sebutkan komponen yang sudah terukur.** Gambar $0,045 (3 × $0,015), ASR $0 dari kuota gratis. Bila menyebut rupiah, sertakan kurs dan tanggalnya. Biaya teks 9router baru boleh disebut setelah O6 terjawab. Jangan menyebut total sebelum lengkap — lihat ADR-007. |
-| "Apa bedanya dengan Canva atau marketplace?" | Ketiga pembeda di `DESIGN.md` bagian 9, ditambah bahwa keduanya tidak dapat dioperasikan pengguna tunanetra. |
+| "Bagaimana kalau pengrajin tidak bisa membaca sama sekali?" | Tombol pembaca transkrip dan dukungan pembaca layar sistem tersedia. Voice Navigation di dalam aplikasi belum tersedia; jangan mendemokannya sebagai fitur jadi. |
+| "Berapa biaya per katalog?" | Jangan menyebut angka total sebelum biaya penyedia yang dipakai malam ini diukur kembali. Jelaskan komponen gambar, transkripsi, teks, dan hosting. |
+| "Apa bedanya dengan Canva atau marketplace?" | Tunjukkan alur foto dan cerita suara, peninjauan pengrajin, serta katalog publik dengan teks/subtitle. Hindari klaim tentang kemampuan produk lain tanpa pengujian. |
 | "Bagaimana model bisnisnya?" | Jujur bahwa ini di luar lingkup rilis, dan sebutkan arah yang dipertimbangkan. Jangan mengarang angka proyeksi. |
 
 ## Setelah demo
