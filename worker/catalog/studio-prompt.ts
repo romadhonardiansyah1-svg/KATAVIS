@@ -29,10 +29,9 @@ export interface StudioPromptInput {
 const STYLE_DIRECTIONS: Record<ImageStyle, { readonly scene: string }> = {
   marble_light: {
     scene:
-      "Produk difoto dari sudut tiga-perempat di atas meja marmer putih bersih, " +
-      "pencahayaan studio softbox profesional dari kiri atas, bayangan kontak " +
-      "yang halus dan natural, latar gradient abu-abu muda ke putih dengan " +
-      "sedikit kesan ruang agar tidak datar.",
+      "Permukaan marmer terang matte, latar putih gading polos, softbox besar " +
+      "dari kiri 45 derajat, isian cahaya lembut dari kanan, dan bayangan " +
+      "kontak alami tepat di bawah produk.",
   },
   wood_warm: {
     scene:
@@ -48,9 +47,9 @@ const STYLE_DIRECTIONS: Record<ImageStyle, { readonly scene: string }> = {
   },
   rattan_natural: {
     scene:
-      "Produk difoto di atas anyaman rotan alami dengan daun hijau yang blur " +
-      "lembut di latar, cahaya alami siang yang cerah dan segar, kesan " +
-      "kerajinan tangan Nusantara yang hangat dan hidup.",
+      "Permukaan anyaman rotan alami sebagai alas, latar krem polos, " +
+      "cahaya alami dari samping yang memperlihatkan tekstur produk tanpa " +
+      "daun atau properti dekoratif lain.",
   },
   clay_minimal: {
     scene:
@@ -83,9 +82,13 @@ export function styleDirection(style: ImageStyle): string {
  */
 export function buildAutoStudioPrompt(input: StudioPromptInput): string {
   return (
-    `Foto katalog komersial studio yang menarik dan estetik untuk ${input.productLabel}. ` +
+    `Foto katalog untuk produk berikut. Konteks dari cerita pengrajin: ${input.productLabel}. ` +
+    `Foto sumber menentukan rupa produk; cerita hanya menjelaskan identitasnya, ` +
+    `bukan izin menciptakan detail yang tidak terlihat. ` +
     `${styleDirection(input.style)} ` +
-    `Gaya fotografi katalog pameran seni kriya internasional: tajam, hidup, dan menjual.`
+    `Bingkai seluruh produk dengan ruang cukup di tepinya. Fokus tajam pada ` +
+    `tekstur dan sambungan buatan tangan, warna tetap setia pada foto sumber. ` +
+    `Latar dan alas mendukung produk tanpa properti, tulisan, atau watermark.`
   );
 }
 

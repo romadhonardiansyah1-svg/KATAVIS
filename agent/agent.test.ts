@@ -16,7 +16,27 @@
 import { describe, expect, it } from "vitest";
 
 import { AgentRuntimeError, GEMINI_SELECTORS, reasonFromFailure } from "./chrome.js";
-import { isExpired, parseJob } from "./worker.js";
+import { buildGeminiEditPrompt, imageExtension, isExpired, parseJob } from "./worker.js";
+
+describe("agent — prompt edit foto", () => {
+  it("menggunakan konteks produk dan mengizinkan latar terpilih tanpa menambah barang", () => {
+    const prompt = buildGeminiEditPrompt("Tas anyaman pandan di atas permukaan rotan.");
+    expect(prompt).toContain("Tas anyaman pandan");
+    expect(prompt).toContain("foto yang dilampirkan");
+    expect(prompt).toContain("permukaan");
+    expect(prompt).not.toContain("SATU-SATUNYA objek di foto");
+    expect(prompt).toContain("Jangan mengubah bentuk, warna, tekstur");
+  });
+});
+
+describe("agent — berkas foto sumber", () => {
+  it("memakai ekstensi yang sesuai dengan isi berkas saat melampirkan foto", () => {
+    expect(imageExtension(new Uint8Array([0xff, 0xd8, 0xff]))).toBe("jpg");
+    expect(imageExtension(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBe("png");
+    expect(imageExtension(new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toBe("webp");
+    expect(imageExtension(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+});
 
 describe("agent — penerjemahan kegagalan menjadi alasan", () => {
   it("meneruskan alasan yang sudah ditetapkan AgentRuntimeError", () => {

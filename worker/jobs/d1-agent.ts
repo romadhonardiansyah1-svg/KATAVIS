@@ -9,7 +9,6 @@
  */
 
 import { d1ListJobs, type JobRecord } from "./d1-jobs";
-import { buildImagePrompt } from "./payload";
 
 export interface AgentHeartbeat {
   readonly agentId: string;
@@ -291,7 +290,7 @@ export async function d1RetryJob(
   const result = await db
     .prepare(
       `UPDATE jobs
-       SET status = 'queued', attempt = attempt + 1, progress = 0, error_code = NULL,
+       SET status = 'queued', progress = 0, error_code = NULL,
            provider = NULL, claimed_by = NULL, started_at = NULL, completed_at = NULL,
            deadline_at = NULL
        WHERE id = ? AND status IN ('failed', 'cancelled')`,

@@ -63,6 +63,22 @@ export function isExpired(job, nowMs) {
   return remainingMs(job.deadlineAt, nowMs) <= 0;
 }
 
+export function imageExtension(bytes) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  if (bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "webp";
+  return null;
+}
+
+export function buildGeminiEditPrompt(serverPrompt) {
+  return `Edit foto produk yang dilampirkan menjadi foto katalog. Arah penataan: ${serverPrompt}.
+
+Aturan hasil:
+- Gunakan foto yang dilampirkan sebagai satu-satunya acuan visual produk. Jangan mengubah bentuk, warna, tekstur, proporsi, pola, sambungan, atau jumlah bagian produk.
+- Produk adalah satu-satunya barang dagangan. Permukaan dan latar sesuai arahan boleh terlihat, tetapi jangan menambah tangan, kemasan, tanaman, atau properti lain.
+- Tampilkan produk utuh, dengan bayangan kontak yang masuk akal. Tanpa tulisan, logo, atau watermark.`;
+}
+
 /**
  * Membuat gambar di Gemini web.
  *
@@ -102,7 +118,11 @@ export async function generateInGemini(job, dependencies) {
     const imageBytes = await dependencies.client.getBinary(`/agent/jobs/${job.id}/source-image`);
     if (imageBytes !== null && imageBytes.byteLength > 0) {
       attachedBytes = imageBytes.byteLength;
-      tempFile = resolve(tmpdir(), `katavis-source-${job.id}.png`);
+      const extension = imageExtension(imageBytes);
+      if (extension === null) {
+        throw new AgentRuntimeError("Format foto sumber tidak dikenali.", "unknown");
+      }
+      tempFile = resolve(tmpdir(), `katavis-source-${job.id}.${extension}`);
       writeFileSync(tempFile, imageBytes);
       log(`Foto asli produk diambil dari server: ${attachedBytes} bita.`);
 
@@ -124,9 +144,11 @@ export async function generateInGemini(job, dependencies) {
       const imageInput = page
         .locator(GEMINI_SELECTORS.imageFileInput[0] ?? 'input[accept*="image"]')
         .first();
+      let inputAccepted = false;
       try {
         await imageInput.waitFor({ state: "attached", timeout: 5_000 });
         await imageInput.setInputFiles(tempFile);
+        inputAccepted = true;
       } catch {
         // Kolom tidak muncul; verifikasi pratinjau di bawah yang menentukan.
       }
@@ -136,7 +158,7 @@ export async function generateInGemini(job, dependencies) {
         .locator('img[src^="blob:"]')
         .count()
         .catch(() => blobsBefore);
-      attached = blobsAfter > blobsBefore;
+      attached = inputAccepted || blobsAfter > blobsBefore;
       if (attached) {
         log(`Foto asli produk berhasil dilampirkan ke Gemini (pratinjau tampil).`);
       } else {
@@ -152,22 +174,13 @@ export async function generateInGemini(job, dependencies) {
     log(`Peringatan lampiran foto: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const serverPrompt = job.prompt.trim();
-  // `attached` (pratinjau tampil), bukan sekadar berkas tertulis, yang
-  // menentukan bingkai prompt: aturan pelestarian hanya benar bila foto
-  // benar-benar ada di chat. Tanpa foto terverifikasi, prompt server dipakai
-  // apa adanya agar model tidak diperintah mengedit lampiran yang tak ada.
-  const promptText =
-    attached
-      ? `Edit foto produk yang saya lampirkan. Arah kreatif: ${serverPrompt.length > 0 ? serverPrompt : "foto katalog studio yang menarik dan estetik"}.
-
-ATURAN MUTLAK:
-- Produk utama adalah SATU-SATUNYA objek di foto hasil. Hapus semua objek lain, tangan, kemasan berlebih, atau gangguan di sekitar produk.
-- Pertahankan produk 100% persis seperti di foto lampiran: bentuk, warna, tekstur bahan, ukuran relatif, dan seluruh detailnya. Jangan menggambar ulang produk menjadi barang lain.
-- Tanpa teks, tanpa watermark, tanpa objek tambahan.`
-      : serverPrompt.length > 0
-        ? serverPrompt
-        : "Buat foto produk studio profesional dari foto produk kerajinan ini. Latar bersih dengan pencahayaan studio yang lembut. JANGAN mengubah bentuk, warna, tekstur, atau proporsi produk. Pertahankan seluruh detail apa adanya.";
+  if (!attached) {
+    if (tempFile !== null) {
+      try { unlinkSync(tempFile); } catch { /* Berkas sementara sudah hilang. */ }
+    }
+    throw new AgentRuntimeError("Foto sumber tidak dapat dilampirkan ke Gemini.", "unknown");
+  }
+  const promptText = buildGeminiEditPrompt(job.prompt.trim());
 
   await assertSessionAlive(page);
 
@@ -384,16 +397,15 @@ async function newestImage(page, countBefore) {
 /**
  * Mengunduh gambar hasil sebagai bita.
  *
- * Dua jalur, dari yang paling tepat sampai yang paling resmi:
+ * Jalur pengambilan hasil, dari byte asli ke bitmap yang sudah dirender:
  *
  *   1. Ambil `src` langsung bila sudah berupa `data:` URL. Ini jalur yang
  *      paling sering berlaku pada Gemini.
- *   2. Klik tombol unduh ("Download gambar ukuran penuh") dan tangkap
- *      berkasnya lewat peristiwa unduhan. Ini berkas ASLI resolusi penuh
- *      dari Gemini — bukan tangkapan layar.
- *   3. Minta halamannya mengambil bita lewat `fetch`. Bekerja untuk `blob:`
- *      maupun `https:` karena berjalan di konteks halaman yang punya cookie
- *      sesi.
+ *   2. Minta halaman mengambil byte lewat `fetch`.
+ *   3. Baca bitmap dari <img> di dalam generated-image ke kanvas luar layar.
+ *      Blob Gemini dapat dicabut sebelum `fetch` berjalan; bitmap tetap ada.
+ *      Ini hanya piksel gambar hasil, tanpa kontrol atau pratinjau lampiran.
+ *   4. Klik tombol unduh ukuran penuh bila jalur cepat di atas gagal.
  *
  * Yang SENGAJA tidak ada: tangkapan layar elemen sebagai "hasil". Dua aset
  * yang pernah tersimpan lewat jalur itu terbukti berisi BELUM tentu gambar
@@ -418,6 +430,21 @@ async function downloadImage(found, context) {
   if (inline !== null) {
     log(`Unduh via data-url: ${inline.bytes.byteLength} bita.`);
     return inline;
+  }
+
+  const fetched = await fetchViaPage(found.src, page, log).catch((err) => {
+    log(`Fetch halaman gagal: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}.`);
+    return null;
+  });
+  if (fetched !== null && fetched.bytes.byteLength > 0) {
+    log(`Unduh via fetch halaman: ${fetched.bytes.byteLength} bita (${fetched.mimeType}).`);
+    return fetched;
+  }
+
+  const rendered = await renderedImageBytes(found, page);
+  if (rendered !== null) {
+    log(`Bitmap gambar hasil terbaca: ${rendered.bytes.byteLength} bita (${rendered.mimeType}).`);
+    return rendered;
   }
 
   const downloadButton = await firstMatch(page, GEMINI_SELECTORS.downloadButton, 5_000);
@@ -449,17 +476,23 @@ async function downloadImage(found, context) {
     log("Tombol unduh tidak ditemukan di halaman.");
   }
 
-  const fetched = await fetchViaPage(found.src, page, log).catch((err) => {
-    log(`Fetch halaman gagal: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}.`);
-    return null;
-  });
-  if (fetched !== null && fetched.bytes.byteLength > 0) {
-    log(`Unduh via fetch halaman: ${fetched.bytes.byteLength} bita (${fetched.mimeType}).`);
-    return fetched;
-  }
-
   log("Seluruh jalur unduhan gagal. Pekerjaan diserahkan ke penyedia cadangan.");
   return null;
+}
+
+async function renderedImageBytes(found, page) {
+  const source = await page.locator(found.selector).nth(found.index).evaluate((image, expectedSource) => {
+    if (image.tagName !== "IMG" || image.naturalWidth === 0 || image.naturalHeight === 0) return null;
+    if (image.currentSrc !== expectedSource) return null;
+    const canvas = image.ownerDocument.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (context === null) return null;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
+  }, found.src).catch(() => null);
+  return source === null ? null : inlineDataUrl(source);
 }
 
 /**
@@ -530,17 +563,6 @@ async function fetchViaPage(source, page, log) {
   const bytes = new Uint8Array(Buffer.from(payload, "base64"));
   return bytes.byteLength > 0 ? { bytes, mimeType: mimeFromBytes(bytes) } : null;
 }
-
-/**
- * Dihapus: tangkapan layar elemen sebagai "hasil" (dihentikan Sep 2026).
- *
- * Dua aset yang tersimpan lewat jalur ini terbukti BUKAN gambar hasil:
- * satu memuat tombol UI Gemini di dalam pikselnya (tangkapan menangkap
- * seluruh komposit kotak itu termasuk overlay), satu lagi menangkap foto
- * input + kolom chat. Tangkapan layar tidak dapat membedakan ketiganya,
- * sehingga kegagalan unduhan sekarang dikembalikan sebagai gagal dan rantai
- * fallback (Workers AI → foto asli) bekerja dengan jujur.
- */
 
 /**
  * @param {readonly Uint8Array[]} chunks

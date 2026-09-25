@@ -197,9 +197,9 @@ export async function d1SetProgress(
  * Menulis hasil gambar dan menutup pekerjaannya.
  *
  * Satu batch, empat pernyataan — bukan empat perjalanan ke basis data.
- * Aset hasil ditulis sebagai baris **baru** dengan `kind = 'photo_studio'`;
- * tidak ada pernyataan di sini yang menyentuh `photo_original`, dan itu
- * bukan kelalaian melainkan aturan 7 AGENTS.md.
+ * Aset hasil ditulis sebagai baris **baru** dengan `kind = 'photo_studio'`.
+ * Foto asli tetap ada dan bitanya tidak ditimpa; hanya penanda foto utamanya
+ * yang dicabut saat hasil studio siap.
  *
  * Hasil studio menjadi primer karena ia yang ditampilkan katalog. Foto asli
  * tetap ada, tetap terkonfirmasi, dan tetap dapat dipilih kembali lewat
@@ -239,7 +239,7 @@ export async function d1FinishImageJob(
     db
       .prepare(
         `UPDATE media_assets SET is_primary = 0
-         WHERE product_id = ? AND kind = 'photo_studio' AND id <> ?`,
+         WHERE product_id = ? AND id <> ?`,
       )
       .bind(input.productId, input.mediaId),
     db

@@ -1630,6 +1630,8 @@ route("POST", `${API_PREFIX}/products/:id/jobs/:jobId/retry`, "session", async (
   const retried = await d1RetryJob(context.env.DB, jobId);
   if (!retried) return apiError("NOT_FOUND");
 
+  await enqueueJobs(context, [{ id: jobId, productId, kind: job.kind }]);
+
   await audit(context, "retry_job", "job", jobId);
 
   return apiOk({ id: jobId, kind: job.kind, status: "queued" });
@@ -1710,8 +1712,17 @@ route("POST", `${API_PREFIX}/agent/jobs/:jobId/complete`, "agent", async (contex
   const parsed = AgentCompleteSchema.safeParse(await readJson(context.request));
   if (!parsed.success) return apiError("FORBIDDEN");
 
+  const job = await d1FindJob(context.env.DB, jobId);
+  if (job === null || job.kind !== "image" || job.status !== "running") return apiError("NOT_FOUND");
+  const studio = await context.env.DB.prepare(
+    `SELECT id FROM media_assets
+     WHERE product_id = ? AND r2_key = ? AND kind = 'photo_studio' AND upload_status = 'confirmed'`,
+  ).bind(job.productId, parsed.data.r2Key).first<{ id: string }>();
+  if (studio === null) return apiError("NOT_FOUND");
+
   const completed = await d1CompleteJob(context.env.DB, jobId, context.nowMs);
   if (!completed) return apiError("NOT_FOUND");
+  await d1PatchMediaAsset(context.env.DB, studio.id, { isPrimary: true });
 
   return apiOk({ id: jobId, status: "succeeded" });
 });
@@ -2100,6 +2111,21 @@ export default {
         console.warn(`[queue] Pesan tidak dikenal dilewati: ${JSON.stringify(message.body)}`);
         message.ack();
         continue;
+      }
+
+      // Queue dapat menerima pesan sebelum polling agen berikutnya. Satu
+      // pengulangan (30 detik di wrangler.jsonc) memberi Gemini kesempatan
+      // mengklaimnya; pengiriman kedua memakai Workers AI bila masih antre.
+      if (parsed.kind === "image" && message.attempts === 1) {
+        const heartbeat = await d1LatestHeartbeat(env.DB);
+        if (
+          heartbeat?.healthy === true &&
+          nowMs - heartbeat.lastSeenAt >= 0 &&
+          nowMs - heartbeat.lastSeenAt < LIMITS.AGENT_HEARTBEAT_TIMEOUT_MS
+        ) {
+          message.retry();
+          continue;
+        }
       }
 
       let outcome: JobOutcome;

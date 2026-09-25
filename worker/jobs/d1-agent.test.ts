@@ -351,6 +351,7 @@ describe("jobs/d1-agent — penyelesaian dan pengembalian", () => {
 
     expect(await d1RetryJob(db, "j1")).toBe(true);
     expect(recorded[0]?.sql).toContain("status = 'queued'");
+    expect(recorded[0]?.sql).not.toContain("attempt = attempt + 1");
     expect(recorded[0]?.sql).toContain("WHERE id = ? AND status IN ('failed', 'cancelled')");
   });
 

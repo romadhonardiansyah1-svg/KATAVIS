@@ -109,7 +109,15 @@ export async function d1ConfirmMediaAsset(
   await db
     .prepare(
       `UPDATE media_assets
-       SET upload_status = 'confirmed', mime_type = ?, bytes = ?
+       SET upload_status = 'confirmed', mime_type = ?, bytes = ?,
+           is_primary = CASE
+             WHEN kind = 'photo_original' AND NOT EXISTS (
+               SELECT 1 FROM media_assets AS selected
+               WHERE selected.product_id = media_assets.product_id
+                 AND selected.is_primary = 1 AND selected.id != media_assets.id
+             ) THEN 1
+             ELSE is_primary
+           END
        WHERE id = ?`,
     )
     .bind(measured.mimeType, measured.bytes, mediaId)

@@ -50,6 +50,8 @@ describe("studio-prompt — prompt otomatis", () => {
     expect(first).toContain("tas kulit sapi");
     expect(second).toContain("pakan duckweed dan larva bsf");
     expect(first).not.toBe(second);
+    expect(first).not.toContain("menarik dan estetik");
+    expect(first).toContain("foto sumber");
   });
 
   it("memuat aturan produk-tunggal pada setiap gaya", () => {

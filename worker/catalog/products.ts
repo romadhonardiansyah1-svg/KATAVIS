@@ -310,7 +310,8 @@ export async function publishProduct(
   const detail = await loadProductDetail(db, productId);
   if (detail === null) return { ok: false, code: "NOT_FOUND" };
 
-  if (!isContentComplete(detail.content.get("id") ?? null)) {
+  const sourceContent = detail.content.get("id") ?? null;
+  if (!isContentComplete(sourceContent)) {
     return { ok: false, code: "CONTENT_INCOMPLETE" };
   }
 
@@ -318,15 +319,26 @@ export async function publishProduct(
     return { ok: false, code: "PHOTO_REQUIRED" };
   }
 
+  const slug = product.slug ?? productSlug(sourceContent?.name ?? "", product.id);
   // `progress` 100 mengikuti contoh produk terbit di kontrak API bagian 4.
   await db.run({
     query: `UPDATE products
-            SET status = 'published', progress = 100, published_at = ?, updated_at = ?
+            SET status = 'published', slug = ?, progress = 100, published_at = ?, updated_at = ?
             WHERE id = ?`,
-    params: [nowMs, nowMs, productId],
+    params: [slug, nowMs, nowMs, productId],
   });
 
-  return { ok: true, product: { ...product, status: "published", progress: 100 } };
+  return { ok: true, product: { ...product, slug, status: "published", progress: 100 } };
+}
+
+export function productSlug(name: string, productId: string): string {
+  const readableName = name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${readableName || "produk"}-${productId.toLowerCase()}`;
 }
 
 // --- Penghapusan ---

@@ -22,6 +22,7 @@ import {
   canTransition,
   createProduct,
   deleteProduct,
+  productSlug,
   requestGeneration,
 } from "./products";
 import {
@@ -57,6 +58,21 @@ const PRODUCT_ROW = {
   slug: null,
   progress: 0,
 };
+
+describe("catalog — slug terbit", () => {
+  it("membentuk URL ASCII dari nama produk beraksen", () => {
+    // TC-U-CAT-07.
+    expect(productSlug("Anyaman Éndék & Batik", PRODUCT_ID)).toBe(
+      `anyaman-endek-batik-${PRODUCT_ID.toLowerCase()}`,
+    );
+  });
+
+  it("membedakan dua produk dengan nama yang sama", () => {
+    // TC-U-CAT-08.
+    const secondId = "01J8ZQFX9K7YWVTN3MABCDP002";
+    expect(productSlug("Tas Kulit", PRODUCT_ID)).not.toBe(productSlug("Tas Kulit", secondId));
+  });
+});
 
 interface RecordedStatement {
   readonly query: string;

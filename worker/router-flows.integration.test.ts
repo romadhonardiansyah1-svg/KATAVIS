@@ -11,6 +11,7 @@
  */
 
 import { applyD1Migrations, env } from "cloudflare:test";
+import { ulid } from "ulid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { ROUTES } from "./index";
@@ -205,6 +206,13 @@ describe("router — alur media", () => {
     expect((await json(confirmed)) as { data: { uploadStatus: string } }).toMatchObject({
       data: { uploadStatus: "confirmed" },
     });
+
+    // TC-I-16: foto asli pertama siap dipakai saat layanan foto AI gagal.
+    const detail = await call(`/api/v1/products/${productId}`, auth(token));
+    const detailBody = (await json(detail)) as {
+      data: { media: { id: string; isPrimary: boolean }[] };
+    };
+    expect(detailBody.data.media.find((media) => media.id === upload.data.mediaId)?.isPrimary).toBe(true);
   });
 
   it("menyajikan byte media lewat URL bertanda tangan, bukan kunci R2", async () => {
@@ -314,6 +322,38 @@ describe("router — alur media", () => {
   });
 });
 
+describe("router — persaingan antrean gambar dan Studio Agent", () => {
+  it("memberi agen sehat kesempatan mengambil pekerjaan sebelum fallback gambar", async () => {
+    // TC-SA-02: konsumen Queue dan agen menerima pekerjaan hampir bersamaan.
+    const token = await login(ARTISAN_PHONE);
+    const productId = await createProduct(token);
+    const jobId = ulid();
+    await env.DB.prepare(
+      "INSERT INTO jobs (id, product_id, kind, status, attempt, progress, created_at) VALUES (?, ?, 'image', 'queued', 0, 0, ?)",
+    ).bind(jobId, productId, Date.now()).run();
+    await env.DB.prepare(
+      "INSERT INTO agent_heartbeats (agent_id, healthy, selectors_ok, chrome_session_ok, last_seen_at) VALUES (?, 1, 1, 1, ?)",
+    ).bind("laptop-01", Date.now()).run();
+
+    let retried = false;
+    let acknowledged = false;
+    const batch = {
+      messages: [{
+        body: { jobId, productId, kind: "image" }, attempts: 1,
+        retry: () => { retried = true; },
+        ack: () => { acknowledged = true; },
+      }],
+    } as unknown as MessageBatch<unknown>;
+    await worker.queue(batch, env);
+
+    const job = await env.DB.prepare("SELECT status FROM jobs WHERE id = ?")
+      .bind(jobId).first<{ status: string }>();
+    expect(retried).toBe(true);
+    expect(acknowledged).toBe(false);
+    expect(job?.status).toBe("queued");
+  });
+});
+
 describe("router — prompt studio", () => {
   it("menyusun prompt otomatis dari transkrip dan gaya", async () => {
     // F2-10, lewat router.
@@ -376,6 +416,40 @@ describe("router — prompt studio", () => {
   });
 });
 
+describe("router — mengulang pekerjaan gagal", () => {
+  it("mengirim kembali pekerjaan teks ke antrean setelah statusnya dipulihkan", async () => {
+    // TC-I-14: tombol coba lagi harus benar-benar memicu konsumen, bukan hanya mengubah D1.
+    const token = await login("+628110000599");
+    const productId = await createProduct(token);
+    const jobId = ulid();
+    await env.DB.prepare(
+      `INSERT INTO jobs (id, product_id, kind, status, locale, attempt, progress, error_code, created_at)
+       VALUES (?, ?, 'copy', 'failed', 'id', 1, 0, 'COPY_GENERATE_FAILED', ?)`,
+    ).bind(jobId, productId, NOW_MS).run();
+
+    const enqueued: unknown[] = [];
+    const queueEnv = {
+      ...env,
+      JOBS: {
+        sendBatch: async (messages: readonly { readonly body: unknown }[]) => {
+          enqueued.push(...messages.map((message) => message.body));
+        },
+      } as unknown as typeof env.JOBS,
+    };
+    const response = await worker.fetch(
+      new Request(`https://api.example/api/v1/products/${productId}/jobs/${jobId}/retry`,
+        auth(token, { method: "POST" })),
+      queueEnv,
+    );
+
+    expect(response.status).toBe(200);
+    expect(enqueued).toEqual([{ jobId, productId, kind: "copy" }]);
+    const job = await env.DB.prepare("SELECT status, attempt FROM jobs WHERE id = ?")
+      .bind(jobId).first<{ status: string; attempt: number }>();
+    expect(job).toEqual({ status: "queued", attempt: 1 });
+  });
+});
+
 describe("router — pengajuan tinjauan", () => {
   it("memajukan processing menjadi review agar publish dapat berjalan", async () => {
     // TC-I-19. Tanpa endpoint ini tidak ada penggerak transisi
@@ -428,6 +502,94 @@ describe("router — pengajuan tinjauan", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+});
+
+describe("router — alur terbit sampai katalog publik", () => {
+  it("menyimpan foto, menerbitkan hasil tinjauan, lalu menyajikannya kepada pembeli", async () => {
+    // TC-I-01, TC-I-05, TC-I-15, TC-I-18, TC-I-19.
+    // Konten AI disemai setelah foto; penyedia eksternal diuji terpisah.
+    const token = await login("+628110000503");
+    const productId = await createProduct(token);
+
+    const ticketResponse = await call(
+      `/api/v1/products/${productId}/media/upload-url`,
+      auth(token, {
+        method: "POST",
+        body: JSON.stringify({ kind: "photo_original", mimeType: "image/jpeg", bytes: JPEG_BYTES.length }),
+      }),
+    );
+    expect(ticketResponse.status).toBe(200);
+    const ticket = (await json(ticketResponse)) as { data: { mediaId: string; uploadUrl: string } };
+
+    const uploaded = await call(ticket.data.uploadUrl.replace("https://api.example", ""), {
+      method: "PUT",
+      body: JPEG_BYTES,
+      headers: { "Content-Length": String(JPEG_BYTES.length) },
+    });
+    expect(uploaded.status).toBe(200);
+    const confirmed = await call(
+      `/api/v1/products/${productId}/media/${ticket.data.mediaId}/confirm`,
+      auth(token, { method: "POST" }),
+    );
+    expect(confirmed.status).toBe(200);
+
+    const primary = await call(
+      `/api/v1/products/${productId}/media/${ticket.data.mediaId}`,
+      auth(token, { method: "PATCH", body: JSON.stringify({ isPrimary: true, altText: "Tas kulit buatan tangan" }) }),
+    );
+    expect(primary.status).toBe(200);
+
+    await env.DB.prepare(
+      `INSERT INTO product_content
+         (id, product_id, locale, name, story, specs, social_copy, seo_keywords, source, updated_at)
+       VALUES (?, ?, 'id', ?, ?, ?, ?, ?, 'ai', ?)`,
+    )
+      .bind(
+        ulid(),
+        productId,
+        "Tas Kulit Uji",
+        "Tas kulit ini dijahit tangan oleh pengrajin selama tiga hari.",
+        JSON.stringify(["Kulit sapi nabati", "Jahitan tangan"]),
+        "Tas kulit buatan tangan.",
+        JSON.stringify(["tas kulit"]),
+        NOW_MS,
+      )
+      .run();
+    await env.DB.prepare("UPDATE products SET status = 'processing' WHERE id = ?")
+      .bind(productId)
+      .run();
+
+    const submitted = await call(`/api/v1/products/${productId}/submit`, auth(token, { method: "POST" }));
+    expect(submitted.status).toBe(200);
+    const consented = await call(
+      "/api/v1/consent",
+      auth(token, { method: "POST", body: JSON.stringify({ kind: "publication", granted: true }) }),
+    );
+    expect(consented.status).toBe(200);
+
+    const published = await call(
+      `/api/v1/products/${productId}/publish`,
+      auth(token, { method: "POST", body: JSON.stringify({ consentConfirmed: true }) }),
+    );
+    expect(published.status).toBe(200);
+    const publishedBody = (await json(published)) as { data: { slug: string } };
+    expect(publishedBody.data.slug).toMatch(/^tas-kulit-uji-[a-z0-9]+$/);
+
+    const buyerResponse = await call(`/api/v1/public/catalog/${publishedBody.data.slug}`);
+    expect(buyerResponse.status).toBe(200);
+    const buyerCatalog = (await json(buyerResponse)) as {
+      data: { name: string; artisan: { displayName: string | null }; media: { url: string }[] };
+    };
+    expect(buyerCatalog.data.name).toBe("Tas Kulit Uji");
+    expect(buyerCatalog.data.artisan.displayName).toBe("Pengrajin");
+    expect(buyerCatalog.data.media[0]?.url).toMatch(/^https:\/\/api\.example\/api\/v1\/media\//);
+    const photoUrl = buyerCatalog.data.media[0]?.url;
+    if (photoUrl === undefined) throw new Error("Katalog publik tidak mengembalikan URL foto");
+    const photoResponse = await call(new URL(photoUrl).pathname);
+    expect(photoResponse.status).toBe(200);
+    expect(photoResponse.headers.get("Content-Type")).toBe("image/jpeg");
+    expect(new Uint8Array(await photoResponse.arrayBuffer())).toEqual(JPEG_BYTES);
   });
 });
 
@@ -563,6 +725,24 @@ describe("router — unggahan hasil Studio Agent", () => {
     expect(confirmedBody.data.mediaId).toBe(ticket.data.mediaId);
     // Kunci hasil selalu berawalan studio-, tidak pernah menimpa foto asli.
     expect(confirmedBody.data.r2Key).toContain("/studio-");
+
+    await env.DB.prepare(
+      `INSERT INTO media_assets (id, product_id, kind, r2_key, mime_type, bytes, is_primary, upload_status, created_at)
+       VALUES (?, ?, 'photo_original', ?, 'image/png', ?, 1, 'confirmed', ?)`,
+    ).bind(ulid(), productId, `products/${productId}/original-smoke.png`, PNG_BYTES.length, NOW_MS).run();
+    const completed = await call(`/api/v1/agent/jobs/${jobId}/complete`, {
+      method: "POST",
+      headers: agentHeaders(agentKey),
+      body: JSON.stringify({ r2Key: confirmedBody.data.r2Key, durationMs: 12_000 }),
+    });
+    expect(completed.status).toBe(200);
+    const media = await env.DB.prepare(
+      "SELECT kind, is_primary FROM media_assets WHERE product_id = ? ORDER BY kind",
+    ).bind(productId).all<{ kind: string; is_primary: number }>();
+    expect(media.results).toEqual([
+      { kind: "photo_original", is_primary: 0 },
+      { kind: "photo_studio", is_primary: 1 },
+    ]);
   });
 
   it("menolak tanpa kunci agen", async () => {
