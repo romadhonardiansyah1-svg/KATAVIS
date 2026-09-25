@@ -1,0 +1,9 @@
+# Fingerprints from an old test-fixture commit. These are fixed signing and
+# idempotency values used only by unit/integration tests, not service secrets.
+# Keep each exception tied to its original commit, path, rule, and line so
+# future findings in the same files are still reported.
+bd2e40c8cebb3e2bb0a12189e44dea0e00443e8b:worker/auth/middleware.test.ts:generic-api-key:17
+bd2e40c8cebb3e2bb0a12189e44dea0e00443e8b:worker/auth/token.test.ts:generic-api-key:25
+bd2e40c8cebb3e2bb0a12189e44dea0e00443e8b:worker/catalog/catalog.test.ts:generic-api-key:37
+bd2e40c8cebb3e2bb0a12189e44dea0e00443e8b:worker/media/upload.integration.test.ts:generic-api-key:27
+bd2e40c8cebb3e2bb0a12189e44dea0e00443e8b:worker/media/upload.test.ts:generic-api-key:399
