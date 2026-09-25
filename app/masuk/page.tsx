@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { actionLabel } from "@/lib/errors";
+import { useAccessibilityProfile } from "@/components/a11y/ProfileProvider";
 import {
   clearAccessToken,
   readAccessToken,
@@ -45,6 +46,7 @@ type Stage = "phone" | "code";
 
 export default function LoginPage(): React.JSX.Element {
   const router = useRouter();
+  const { restoreFromLogin } = useAccessibilityProfile();
 
   const [stage, setStage] = useState<Stage>("phone");
   const [phone, setPhone] = useState("");
@@ -151,6 +153,7 @@ export default function LoginPage(): React.JSX.Element {
     // peramban (TC-SEC-05).
     writeAccessToken(result.data.accessToken);
     writeRefreshToken(result.data.refreshToken);
+    restoreFromLogin(result.data.user.a11yProfile, result.data.user.isNewUser);
 
     router.replace("/create");
   };

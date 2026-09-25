@@ -5,7 +5,7 @@
  *
  * Kemajuannya nyata, bukan animasi tanpa arti: setiap tahap menampilkan
  * pekerjaan yang benar-benar berjalan beserta persentasenya, dan angkanya
- * berasal dari `overallProgress` yang dihitung server dari baris `jobs`.
+ * berasal dari pekerjaan pembuatan teks dan foto yang dilaporkan server.
  *
  * Selama pemrosesan belum selesai, layar ini tidak punya aksi utama — tidak
  * ada yang boleh dikerjakan pengrajin selain menunggu. Begitu selesai, satu
@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
 
 import { StepLoading, StepShell, type StepError } from "../StepShell";
-import { getJobs, requestGeneration, sharpenImagePrompt, type JobView } from "../api";
+import { getJobs, requestGeneration, retryJob, sharpenImagePrompt, type JobView } from "../api";
 import styles from "../flow.module.css";
 import { CheckIcon, ClockIcon, DocumentIcon, RefreshIcon, WarningIcon } from "../icons";
 import { readAccessToken } from "@/lib/session";
@@ -42,7 +42,9 @@ const STAGE_LABEL: Readonly<Record<string, string>> = {
 
 function stageLabel(job: JobView): string {
   const base = STAGE_LABEL[job.kind] ?? job.kind;
-  if (job.kind === "copy" && job.locale !== null) {
+  // `locale` boleh hilang dari respons (kontrak tidak menjamin kehadirannya)
+  // — memanggil toUpperCase pada undefined menjatuhkan seluruh halaman.
+  if (job.kind === "copy" && typeof job.locale === "string" && job.locale.length > 0) {
     return `${base} (${job.locale === "id" ? "Indonesia" : job.locale.toUpperCase()})`;
   }
   return base;
@@ -61,7 +63,6 @@ function messageOf(code: ErrorCode): StepError {
 export default function ProcessPage(): React.JSX.Element {
   const { draft, savedAt, isSaving, update, goTo } = useCreateFlow("process");
   const [jobs, setJobs] = useState<readonly JobView[]>([]);
-  const [overall, setOverall] = useState(0);
   const [error, setError] = useState<StepError | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -83,17 +84,15 @@ export default function ProcessPage(): React.JSX.Element {
         return;
       }
 
-      // Jangan menumpuk pekerjaan baru bila masih ada yang berjalan:
-      // setiap kunjungan ulang halaman sebelumnya selalu membuat 3 baris
-      // baru, dan itulah sumber angka "Tahap 3 dari 42".
+      // Pekerjaan transkripsi berasal dari langkah sebelumnya. Hanya pekerjaan
+      // katalog yang mencegah permintaan pembuatan ulang saat halaman dibuka.
       const existing = await getJobs(token, productId);
       if (cancelled) return;
-      if (
-        existing.ok &&
-        existing.data.jobs.some((job) => job.status === "queued" || job.status === "running")
-      ) {
+      if (!existing.ok) {
+        setError({ message: existing.error.message, action: existing.error.action });
         return;
       }
+      if (existing.data.jobs.some((job) => job.kind === "copy" || job.kind === "image")) return;
 
       // Pemrosesan diminta sekali. Mengulanginya pada setiap penyegaran
       // halaman akan menumpuk pekerjaan yang sama.
@@ -134,7 +133,6 @@ export default function ProcessPage(): React.JSX.Element {
       if (cancelled || !result.ok) return;
 
       setJobs(result.data.jobs);
-      setOverall(result.data.overallProgress);
     };
 
     const timer = window.setInterval(() => {
@@ -158,38 +156,30 @@ export default function ProcessPage(): React.JSX.Element {
 
     setError(null);
     setIsRetrying(true);
-    const manual = draft?.imagePromptManual?.trim() ?? "";
-    const style = draft?.imageStyle ?? "marble_light";
-    let imagePrompt: string | undefined;
-    if (manual.length > 0) {
-      const sharpened = await sharpenImagePrompt(token, productId, {
-        style,
-        manual,
-      });
-      if (sharpened.ok) imagePrompt = sharpened.data.prompt;
+    const failedJobs = displayedJobs.filter((job) => job.status === "failed");
+    for (const job of failedJobs) {
+      const requested = await retryJob(token, productId, job.id);
+      if (!requested.ok) {
+        setIsRetrying(false);
+        setError({ message: requested.error.message, action: requested.error.action });
+        return;
+      }
     }
-
-    const requested = await requestGeneration(token, productId, {
-      tasks: ["copy", "image"],
-      locales: ["id", "en"],
-      imageStyle: style,
-      ...(imagePrompt === undefined ? {} : { imagePrompt }),
-    });
     setIsRetrying(false);
-
-    if (!requested.ok) {
-      setError({ message: requested.error.message, action: requested.error.action });
-    }
   };
 
-  // Server sudah mengembalikan pekerjaan terbaru per jenis dan bahasa.
-  // Pengelompokan di sini hanya pengaman bila respons berisi riwayat lama.
+  // Transkripsi diselesaikan pada langkah cerita. Kegagalannya tidak boleh
+  // menghalangi katalog ketika pengrajin sudah menulis cerita sendiri.
+  // Pengelompokan juga mengabaikan riwayat lama per jenis dan bahasa.
   const displayedJobs = Object.values(
-    jobs.reduce<Record<string, JobView>>((acc, job) => {
+    jobs.filter((job) => job.kind === "copy" || job.kind === "image").reduce<Record<string, JobView>>((acc, job) => {
       acc[stageKey(job)] = job;
       return acc;
     }, {}),
   );
+  const overall = displayedJobs.length === 0
+    ? 0
+    : Math.round(displayedJobs.reduce((progress, job) => progress + job.progress, 0) / displayedJobs.length);
 
   // Yang diumumkan adalah perpindahan tahap, bukan angka kemajuannya.
   // Persentase berubah setiap dua detik; wilayah live yang mengumumkan
@@ -223,6 +213,18 @@ export default function ProcessPage(): React.JSX.Element {
   const stillRunning = displayedJobs.some(
     (job) => job.status === "queued" || job.status === "running",
   );
+  const copyJobs = displayedJobs.filter((job) => job.kind === "copy");
+  const useOriginal =
+    !stillRunning &&
+    copyJobs.length > 0 &&
+    copyJobs.every((job) => job.status === "succeeded") &&
+    displayedJobs.some((job) => job.kind === "image" && job.status === "failed") &&
+    displayedJobs.every((job) => job.status === "succeeded" || job.kind === "image");
+
+  const continueToReview = async (): Promise<void> => {
+    update({ generatedAt: Date.now() });
+    await goTo("review");
+  };
 
   return (
     <StepShell
@@ -233,7 +235,13 @@ export default function ProcessPage(): React.JSX.Element {
         failure === null ? error : { message: failure.message, action: failure.action }
       }
       primary={
-        anyFailed
+        useOriginal
+          ? {
+              label: "Lanjut dengan foto asli",
+              icon: <DocumentIcon />,
+              onClick: continueToReview,
+            }
+          : anyFailed
           ? {
               label: "Coba lagi",
               icon: <RefreshIcon />,
@@ -247,10 +255,7 @@ export default function ProcessPage(): React.JSX.Element {
           : {
               label: "Lanjut periksa hasil",
               icon: <DocumentIcon />,
-              onClick: async () => {
-                update({ generatedAt: Date.now() });
-                await goTo("review");
-              },
+              onClick: continueToReview,
               // Lanjut hanya bila SEMUA tahap berhasil. Gagal berarti ada
               // yang harus dicoba lagi, bukan dilewati diam-diam.
               disabled: !allSucceeded,
@@ -261,6 +266,8 @@ export default function ProcessPage(): React.JSX.Element {
         <ClockIcon size={20} />
         {allSucceeded
           ? "Katalog Anda sudah selesai dibuat."
+          : useOriginal
+            ? "Teks katalog selesai. Foto studio gagal dibuat; foto asli Anda siap dipakai."
           : anyFailed && !stillRunning
             ? "Satu tahap gagal. Tekan Coba lagi."
             : `Membuat katalog... ${overall}%`}
@@ -314,9 +321,17 @@ export default function ProcessPage(): React.JSX.Element {
 
       {failure === null ? null : (
         <p className={styles.hint}>
-          Tekan Coba lagi untuk mengulang tahap yang gagal. Pekerjaan Anda tidak hilang.
+          {useOriginal
+            ? "Anda dapat melanjutkan dengan foto asli atau mencoba membuat foto studio lagi."
+            : "Tekan Coba lagi untuk mengulang tahap yang gagal. Pekerjaan Anda tidak hilang."}
         </p>
       )}
+      {useOriginal ? (
+        <button type="button" className={styles.secondaryLink} onClick={() => void retryGeneration()} disabled={isRetrying}>
+          <RefreshIcon />
+          {isRetrying ? "Meminta ulang..." : "Coba lagi foto studio"}
+        </button>
+      ) : null}
     </StepShell>
   );
 }

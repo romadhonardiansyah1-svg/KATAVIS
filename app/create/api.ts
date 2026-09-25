@@ -12,6 +12,7 @@
  */
 
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import {
   readAccessToken,
   readRefreshToken,
@@ -26,10 +27,10 @@ import {
  * supaya pengembangan lokal berjalan tanpa konfigurasi.
  */
 function getApiBaseUrl(): string {
-  if (typeof window !== "undefined" && window.location?.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:8787`;
-  }
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
+  return resolveApiBaseUrl(
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
 }
 const API_PREFIX = "/api/v1";
 
@@ -407,9 +408,10 @@ export interface JobView {
   readonly kind: string;
   readonly status: string;
   readonly provider: string | null;
-  readonly locale: string | null;
+  /** Boleh hilang — kontrak API bagian 7 tidak menjamin kehadirannya. */
+  readonly locale?: string | null;
   readonly progress: number;
-  readonly attempt: number;
+  readonly attempt?: number;
   /** Bentuk galat yang sama seperti bagian 1, hanya pada pekerjaan gagal. */
   readonly error?: { readonly code: string; readonly message: string; readonly action: string } | null;
 }
@@ -455,8 +457,17 @@ export function getJobs(
   return request(`/products/${productId}/jobs`, token);
 }
 
+export function retryJob(
+  token: string,
+  productId: string,
+  jobId: string,
+): Promise<ApiResult<{ readonly id: string; readonly kind: string; readonly status: string }>> {
+  return jsonRequest(`/products/${productId}/jobs/${jobId}/retry`, token, "POST", {});
+}
+
 // --- Ekspor dan katalog publik (§10) ---
 
 export function publicCatalogUrl(slug: string): string {
-  return `${getApiBaseUrl()}${API_PREFIX}/public/catalog/${slug}`;
+  const path = `/catalog/${encodeURIComponent(slug)}`;
+  return typeof window === "undefined" ? path : `${window.location.origin}${path}`;
 }

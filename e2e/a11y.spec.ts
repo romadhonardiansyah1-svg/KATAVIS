@@ -88,6 +88,10 @@ const ROUTES: readonly { readonly path: string; readonly seed: DraftSeed }[] = [
 
 /** Menyemai draf sebelum halaman dimuat, supaya penjagaan langkah meloloskannya. */
 async function seedDraft(page: Page, seed: DraftSeed): Promise<void> {
+  // Tanpa token, useCreateFlow langsung mengalihkan ke /masuk — baik saat
+  // goto maupun saat tes berikutnya. Menyemainya di sini menutup seluruh
+  // rute yang memakai helper ini, termasuk TC-A11Y-03 dan TC-A11Y-10.
+  await seedAccessToken(page);
   await page.goto("/create/photo");
   await page.evaluate(async (draft) => {
     await new Promise<void>((resolve, reject) => {
@@ -139,6 +143,68 @@ test.describe("@a11y pelanggaran otomatis", () => {
 });
 
 test.describe("@a11y Accessibility Mode", () => {
+  test("bantuan suara yang belum tersedia tidak diklaim aktif", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Mode Aksesibilitas/ }).click();
+    await expect(page.getByLabel("Bantuan suara")).toBeDisabled();
+    await expect(page.getByText("Perintah suara di aplikasi belum tersedia.", { exact: false })).toBeVisible();
+  });
+
+  test("pilihan aksesibilitas sebelum login tetap aktif untuk akun baru", async ({ page }) => {
+    let savedVisual = false;
+    await stubApi(page, "POST", "/auth/otp/request", () => apiOk({
+      expiresAt: Date.now() + 300_000, resendAfter: Date.now() + 60_000,
+    }));
+    await stubApi(page, "POST", "/auth/otp/verify", () => apiOk({
+      accessToken: "uji-sesi", refreshToken: "uji-refresh", expiresIn: 900,
+      user: {
+        id: "01J8ZQFX9K7YWVTN3MABCDP001", displayName: null, role: "artisan",
+        locale: "id", isNewUser: true,
+        a11yProfile: { visual: false, hearing: false, motor: false, cognitive: false, voice: false },
+      },
+    }));
+    await stubApi(page, "PUT", "/me/a11y-profile", (route) => {
+      savedVisual = (route.request().postDataJSON() as { visual: boolean }).visual;
+      return apiOk({});
+    });
+
+    await page.goto("/masuk");
+    await page.getByRole("button", { name: /Mode Aksesibilitas/ }).click();
+    await page.getByLabel("Visual").check();
+    await page.getByRole("button", { name: /Mode Aksesibilitas/ }).click();
+    await page.getByLabel("Nomor ponsel").fill("081234567890");
+    await page.getByRole("button", { name: "Kirim kode" }).click();
+    await page.getByLabel("Kode dari SMS").fill("123456");
+    await page.getByRole("button", { name: "Masuk", exact: true }).click();
+
+    await expect(page.locator("html")).toHaveAttribute("data-a11y-visual", "true");
+    await expect.poll(() => savedVisual).toBe(true);
+  });
+
+  test("profil dari akun langsung aktif setelah masuk pada perangkat baru", async ({ page }) => {
+    // TC-I-13: profil yang tersimpan di server harus menang atas cermin lokal.
+    await stubApi(page, "POST", "/auth/otp/request", () => apiOk({
+      expiresAt: Date.now() + 300_000, resendAfter: Date.now() + 60_000,
+    }));
+    await stubApi(page, "POST", "/auth/otp/verify", () => apiOk({
+      accessToken: "uji-sesi", refreshToken: "uji-refresh", expiresIn: 900,
+      user: {
+        id: "01J8ZQFX9K7YWVTN3MABCDP001", displayName: null, role: "artisan",
+        locale: "id", isNewUser: false,
+        a11yProfile: { visual: true, hearing: false, motor: true, cognitive: false, voice: false },
+      },
+    }));
+
+    await page.goto("/masuk");
+    await page.getByLabel("Nomor ponsel").fill("081234567890");
+    await page.getByRole("button", { name: "Kirim kode" }).click();
+    await page.getByLabel("Kode dari SMS").fill("123456");
+    await page.getByRole("button", { name: "Masuk", exact: true }).click();
+
+    await expect(page.locator("html")).toHaveAttribute("data-a11y-visual", "true");
+    await expect(page.locator("html")).toHaveAttribute("data-a11y-motor", "true");
+  });
+
   test("TC-A11Y-11 tombolnya ada di seluruh rute", async ({ page }) => {
     for (const route of ROUTES) {
       await seedDraft(page, route.seed);

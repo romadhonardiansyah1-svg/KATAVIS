@@ -212,7 +212,7 @@ export default function ReviewPage(): React.JSX.Element {
             </label>
             <textarea
               id="story"
-              className={styles.transcriptField}
+              className={`${styles.transcriptField} ${styles.storyField}`}
               value={content.story}
               onChange={(event) => {
                 setContent({ ...content, story: event.target.value });

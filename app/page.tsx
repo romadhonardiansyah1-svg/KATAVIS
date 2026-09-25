@@ -32,6 +32,7 @@ import {
   type Draft,
 } from "./create/flow";
 import { CameraIcon, ClockIcon, DocumentIcon, KeyIcon, RefreshIcon } from "./create/icons";
+import home from "./home.module.css";
 
 /** Sesi diperiksa sekali, bukan pada setiap render. */
 type Session = "memeriksa" | "ada" | "tidak-ada";
@@ -66,27 +67,42 @@ export default function HomePage(): React.JSX.Element {
   // pertamanya.
   if (session === "tidak-ada") {
     return (
-      <div className={styles.page}>
+      <div className={`${styles.page} ${home.page}`}>
         <header className={styles.header}>
-          <h1 className={styles.title}>KATAVIS</h1>
+          <p className={home.brand}>KATAVIS</p>
         </header>
 
-        <main className={styles.main}>
-          <p className={styles.hint}>
-            Ubah foto produk dan cerita suara Anda menjadi katalog siap jual. Enam langkah, tanpa
-            perlu mengetik.
-          </p>
-          <p className={styles.hint}>
-            Masuk dulu dengan nomor ponsel. Tidak perlu kata sandi.
-          </p>
+        <main className={`${styles.main} ${home.content}`}>
+          <div className={home.intro}>
+            <h1 className={home.title}>Karya Anda, siap diceritakan kepada pembeli.</h1>
+            <p className={home.lead}>
+              Satu foto dan cerita singkat menjadi katalog yang bisa Anda periksa, lalu bagikan.
+            </p>
+          </div>
+          <div className={home.actions}>
+            <Link className={styles.primaryButton} href="/masuk">
+              <KeyIcon />
+              Masuk dengan nomor ponsel
+            </Link>
+          </div>
+          <section className={home.journey} aria-labelledby="alur-judul">
+            <h2 className={home.journeyTitle} id="alur-judul">Dari karya sampai tautan pembeli</h2>
+            <ol className={home.journeyList}>
+              <li className={home.journeyItem}>
+                <span className={home.journeyNumber} aria-hidden="true">01</span>
+                <div><p className={home.journeyName}>Foto karya</p><p className={home.journeyDescription}>Pilih foto asli produk. Foto itu tetap tersimpan saat versi studio dibuat.</p></div>
+              </li>
+              <li className={home.journeyItem}>
+                <span className={home.journeyNumber} aria-hidden="true">02</span>
+                <div><p className={home.journeyName}>Ceritakan</p><p className={home.journeyDescription}>Rekam suara atau tulis cerita. Anda selalu dapat memperbaiki transkripnya.</p></div>
+              </li>
+              <li className={home.journeyItem}>
+                <span className={home.journeyNumber} aria-hidden="true">03</span>
+                <div><p className={home.journeyName}>Periksa dan terbitkan</p><p className={home.journeyDescription}>Tinjau foto dan teks sebelum membagikan katalog kepada pembeli.</p></div>
+              </li>
+            </ol>
+          </section>
         </main>
-
-        <footer className={styles.footer}>
-          <Link className={styles.primaryButton} href="/masuk">
-            <KeyIcon />
-            Masuk
-          </Link>
-        </footer>
       </div>
     );
   }
@@ -95,48 +111,57 @@ export default function HomePage(): React.JSX.Element {
   const target = stepById(furthestAllowedStep(draft));
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${home.page}`}>
       <header className={styles.header}>
-        <h1 className={styles.title}>KATAVIS</h1>
+        <p className={home.brand}>KATAVIS</p>
       </header>
 
-      <main className={styles.main}>
-        <p className={styles.hint}>
-          Ubah foto produk dan cerita suara Anda menjadi katalog siap jual. Enam langkah, tanpa
-          perlu mengetik.
-        </p>
+      <main className={`${styles.main} ${home.content}`}>
+        <div className={home.intro}>
+          <h1 className={home.title}>{resume ? "Lanjutkan karya Anda." : "Mari buat katalog karya Anda."}</h1>
+          <p className={home.lead}>Foto, cerita, dan hasilnya tetap dapat Anda periksa sebelum terbit.</p>
+        </div>
 
         {resume ? (
-          <p className={styles.statusRow} role="status">
+          <p className={`${styles.statusRow} ${home.resume}`} role="status">
             <span className={styles.statusIconAccent}>
               <DocumentIcon size={20} />
             </span>
             Ada katalog yang belum selesai, tersimpan di perangkat ini.
           </p>
         ) : null}
+
+        <div className={home.actions}>
+          <Link className={styles.primaryButton} href={target.path}>
+            {resume ? <DocumentIcon /> : <CameraIcon />}
+            {resume ? `Lanjutkan dari langkah ${target.position}` : "Buat katalog baru"}
+          </Link>
+
+          {resume ? (
+            <button
+              type="button"
+              className={styles.secondaryLink}
+              onClick={() => {
+                void clearDraft().then(() => {
+                  setDraft(EMPTY_DRAFT);
+                });
+              }}
+            >
+              <RefreshIcon size={20} />
+              Mulai katalog baru
+            </button>
+          ) : null}
+        </div>
+
+        <section className={home.journey} aria-labelledby="alur-judul">
+          <h2 className={home.journeyTitle} id="alur-judul">Tiga bagian pekerjaan Anda</h2>
+          <ol className={home.journeyList}>
+            <li className={home.journeyItem}><span className={home.journeyNumber} aria-hidden="true">01</span><div><p className={home.journeyName}>Foto karya</p><p className={home.journeyDescription}>Pilih foto yang menunjukkan bentuk asli produk.</p></div></li>
+            <li className={home.journeyItem}><span className={home.journeyNumber} aria-hidden="true">02</span><div><p className={home.journeyName}>Cerita</p><p className={home.journeyDescription}>Rekam suara atau tulis, lalu periksa transkrip.</p></div></li>
+            <li className={home.journeyItem}><span className={home.journeyNumber} aria-hidden="true">03</span><div><p className={home.journeyName}>Katalog</p><p className={home.journeyDescription}>Periksa hasil dan terbitkan tautan pembeli.</p></div></li>
+          </ol>
+        </section>
       </main>
-
-      <footer className={styles.footer}>
-        <Link className={styles.primaryButton} href={target.path}>
-          {resume ? <DocumentIcon /> : <CameraIcon />}
-          {resume ? `Lanjutkan dari langkah ${target.position}` : "Buat katalog baru"}
-        </Link>
-
-        {resume ? (
-          <button
-            type="button"
-            className={styles.secondaryLink}
-            onClick={() => {
-              void clearDraft().then(() => {
-                setDraft(EMPTY_DRAFT);
-              });
-            }}
-          >
-            <RefreshIcon size={20} />
-            Mulai katalog baru
-          </button>
-        ) : null}
-      </footer>
     </div>
   );
 }

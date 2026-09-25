@@ -29,6 +29,7 @@ import {
 } from "react";
 
 import { ERROR_CATALOG } from "@/lib/errors";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 import { A11yProfileSchema, type A11yProfile } from "@/lib/schemas";
 import { readAccessToken } from "@/lib/session";
 
@@ -59,8 +60,6 @@ export const NO_PROFILE: A11yProfile = {
  */
 const MIRROR_KEY = "katavis.a11yProfile";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
-
 export interface ProfileMessage {
   readonly message: string;
   readonly action: string;
@@ -74,6 +73,7 @@ export interface ProfileState {
   readonly isReady: boolean;
   toggle(key: ProfileKey): void;
   reset(): void;
+  restoreFromLogin(value: unknown, isNewUser: boolean): void;
 }
 
 const ProfileContext = createContext<ProfileState | null>(null);
@@ -121,14 +121,12 @@ function applyProfile(profile: A11yProfile): void {
 async function saveProfile(profile: A11yProfile): Promise<ProfileMessage | null> {
   const token = readAccessToken();
   if (token === null) {
-    return {
-      message: ERROR_CATALOG.UNAUTHENTICATED.message,
-      action: ERROR_CATALOG.UNAUTHENTICATED.action,
-    };
+    return null;
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/me/a11y-profile`, {
+    const apiBaseUrl = resolveApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL, window.location.origin);
+    const response = await fetch(`${apiBaseUrl}/api/v1/me/a11y-profile`, {
       method: "PUT",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(profile),
@@ -218,9 +216,28 @@ export function ProfileProvider({
     });
   }, []);
 
+  const restoreFromLogin = useCallback((value: unknown, isNewUser: boolean): void => {
+    const parsed = A11yProfileSchema.safeParse(value);
+    if (!parsed.success) return;
+    const localChoice = isNewUser ? readMirror() : null;
+    const restored = localChoice ?? parsed.data;
+    setProfile(restored);
+    applyProfile(restored);
+    writeMirror(restored);
+    setError(null);
+    if (localChoice !== null) {
+      setIsSaving(true);
+      void saveProfile(restored).then((failure) => {
+        setIsSaving(false);
+        if (failure === null) setSavedAt(Date.now());
+        else setError(failure);
+      });
+    }
+  }, []);
+
   const value = useMemo<ProfileState>(
-    () => ({ profile, isSaving, savedAt, error, isReady, toggle, reset }),
-    [profile, isSaving, savedAt, error, isReady, toggle, reset],
+    () => ({ profile, isSaving, savedAt, error, isReady, toggle, reset, restoreFromLogin }),
+    [profile, isSaving, savedAt, error, isReady, toggle, reset, restoreFromLogin],
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

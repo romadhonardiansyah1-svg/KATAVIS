@@ -19,6 +19,7 @@
 import { useId, useState } from "react";
 
 import styles from "./accessibility.module.css";
+import { actionLabel } from "@/lib/errors";
 import { PROFILE_KEYS, useAccessibilityProfile, type ProfileKey } from "./ProfileProvider";
 
 interface ProfileCopy {
@@ -40,7 +41,7 @@ const PROFILE_COPY: Readonly<Record<ProfileKey, ProfileCopy>> = {
   },
   hearing: {
     label: "Pendengaran",
-    hint: "Setiap suara mendapat padanan tulisan atau gambar.",
+    hint: "Subtitle, pesan tertulis, dan getar tersedia bila perangkat mendukungnya.",
   },
   motor: {
     label: "Motorik",
@@ -48,11 +49,11 @@ const PROFILE_COPY: Readonly<Record<ProfileKey, ProfileCopy>> = {
   },
   cognitive: {
     label: "Kognitif",
-    hint: "Satu aksi per layar, bahasa lebih sederhana, kemajuan selalu terlihat.",
+    hint: "Satu aksi utama per layar dan langkah kerja yang selalu tertulis.",
   },
   voice: {
     label: "Bantuan suara",
-    hint: "Aksi dapat dijalankan dengan perintah suara.",
+    hint: "Perintah suara di aplikasi belum tersedia. Gunakan kendali suara bawaan perangkat.",
   },
 };
 
@@ -168,7 +169,7 @@ export function AccessibilityToggle(): React.JSX.Element {
   const status = isSaving
     ? { icon: <ClockIcon />, text: "Menyimpan pengaturan...", tone: styles.statusBusy }
     : error !== null
-      ? { icon: <WarningIcon />, text: `${error.message} ${error.action}`, tone: styles.statusError }
+      ? { icon: <WarningIcon />, text: `${error.message} ${actionLabel(error.action)}`, tone: styles.statusError }
       : savedAt !== null
         ? {
             icon: <CheckIcon />,
@@ -221,6 +222,7 @@ export function AccessibilityToggle(): React.JSX.Element {
                     className={styles.checkbox}
                     type="checkbox"
                     checked={profile[key]}
+                    disabled={key === "voice" && !profile.voice}
                     onChange={() => {
                       toggle(key);
                     }}

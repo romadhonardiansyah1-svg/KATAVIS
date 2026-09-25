@@ -156,18 +156,27 @@ async function stubMainFlowApi(page: Page): Promise<void> {
           kind: "copy",
           status: "succeeded",
           provider: "9router",
+          // Server selalu menyertakan locale (null untuk pekerjaan tanpa
+          // bahasa). Tanpa bidang ini `stageLabel` menerima undefined dan
+          // menjatuhkan halaman proses.
+          locale: "id",
           progress: 100,
+          attempt: 1,
           startedAt: Date.now() - 30_000,
           completedAt: Date.now(),
+          error: null,
         },
         {
           id: "01J8ZQFX9K7YWVTN3MABCDJ023",
           kind: "image",
           status: "succeeded",
           provider: "workers_ai",
+          locale: null,
           progress: 100,
+          attempt: 1,
           startedAt: Date.now() - 20_000,
           completedAt: Date.now(),
+          error: null,
         },
       ],
       overallProgress: 100,
@@ -198,6 +207,149 @@ const DRAFT_READY_TO_PUBLISH = {
 } as const satisfies Partial<Draft>;
 
 test.describe("TC-E2E-01 alur utama", () => {
+  test("pekerjaan transkripsi yang selesai tidak menghalangi pembuatan katalog", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, {
+      ...DRAFT_READY_TO_PUBLISH,
+      audioJobId: JOB_ID,
+      generatedAt: null,
+      contentReviewedAt: null,
+    });
+    await stubApi(page, "GET", "/products/:id/jobs", () => apiOk({
+      jobs: [{ id: JOB_ID, kind: "asr", status: "succeeded", progress: 100 }],
+      overallProgress: 100,
+    }));
+    let generationRequests = 0;
+    await stubApi(page, "POST", "/products/:id/generate", () => {
+      generationRequests += 1;
+      return apiOk({ jobs: [] });
+    });
+
+    await openStep(page, "/create/process");
+    await expect.poll(() => generationRequests).toBe(1);
+    await expect(page.getByRole("progressbar", { name: "Kemajuan pembuatan katalog" })).toHaveAttribute("aria-valuenow", "0");
+  });
+
+  test("transkripsi gagal yang telah diganti cerita tertulis tidak menahan hasil katalog", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, {
+      ...DRAFT_READY_TO_PUBLISH,
+      audioJobId: JOB_ID,
+      generatedAt: null,
+      contentReviewedAt: null,
+    });
+    await stubApi(page, "GET", "/products/:id/jobs", () => apiOk({
+      jobs: [
+        { id: JOB_ID, kind: "asr", status: "failed", progress: 0, error: {
+          code: "ASR_FAILED", message: "Rekaman belum berhasil didengar. Cerita Anda tetap tersimpan.",
+          action: "RETRY_OR_TYPE",
+        } },
+        { id: "01J8ZQFX9K7YWVTN3MABCDJ024", kind: "copy", locale: "id", status: "succeeded", progress: 100 },
+        { id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", locale: null, status: "succeeded", progress: 100 },
+      ],
+      overallProgress: 67,
+    }));
+
+    await openStep(page, "/create/process");
+    await expect(page.getByRole("button", { name: "Lanjut periksa hasil" })).toBeEnabled();
+    await expect(page.getByText("Mendengarkan rekaman Anda")).toHaveCount(0);
+    await expect(page.getByRole("progressbar", { name: "Kemajuan pembuatan katalog" })).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  test("foto AI gagal: katalog tetap dapat ditinjau dengan foto asli", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, { ...DRAFT_READY_TO_PUBLISH, generatedAt: null, contentReviewedAt: null });
+    await stubApi(page, "GET", "/products/:id/jobs", () => apiOk({
+      jobs: [
+        { id: JOB_ID, kind: "copy", locale: "id", status: "succeeded", progress: 100 },
+        { id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", locale: null,
+          status: "failed", progress: 0, error: {
+            code: "IMAGE_GENERATE_FAILED",
+            message: "Foto studio belum berhasil dibuat. Foto asli Anda tetap tersimpan.",
+            action: "RETRY_OR_USE_ORIGINAL",
+          } },
+      ],
+      overallProgress: 50,
+    }));
+    await stubApi(page, "GET", "/products/:id", () => productDetail());
+
+    await openStep(page, "/create/process");
+    const continueOriginal = page.getByRole("button", { name: "Lanjut dengan foto asli" });
+    await expect(continueOriginal).toBeEnabled();
+    await continueOriginal.click();
+    await expect(page).toHaveURL(/\/create\/review$/);
+    await expect(page.getByLabel("Nama produk")).toHaveValue(PRODUCT_NAME);
+  });
+
+  test("mengulang hanya pekerjaan teks yang gagal tanpa membuat gambar baru", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, { ...DRAFT_READY_TO_PUBLISH, generatedAt: null, contentReviewedAt: null });
+
+    let retried = false;
+    let generationRequests = 0;
+    await stubApi(page, "GET", "/products/:id/jobs", () => apiOk({
+      jobs: [
+        {
+          id: JOB_ID, kind: "copy", locale: "id",
+          status: retried ? "succeeded" : "failed", progress: retried ? 100 : 0,
+          error: retried ? null : {
+            code: "COPY_GENERATE_FAILED", message: "Teks katalog belum berhasil dibuat. Cerita Anda tetap tersimpan.",
+            action: "RETRY",
+          },
+        },
+        { id: "01J8ZQFX9K7YWVTN3MABCDJ023", kind: "image", locale: null,
+          status: "succeeded", progress: 100, error: null },
+      ],
+      overallProgress: retried ? 100 : 50,
+    }));
+    await stubApi(page, "POST", "/products/:id/jobs/:jobId/retry", () => {
+      retried = true;
+      return apiOk({ id: JOB_ID, kind: "copy", status: "queued" });
+    });
+    await stubApi(page, "POST", "/products/:id/generate", () => {
+      generationRequests += 1;
+      return apiOk({ jobs: [] });
+    });
+
+    await openStep(page, "/create/process");
+    await expect(page.getByRole("button", { name: "Coba lagi" })).toBeEnabled();
+    await page.getByRole("button", { name: "Coba lagi" }).click();
+    await expect.poll(() => retried).toBe(true);
+    expect(generationRequests).toBe(0);
+    await expect(page.getByRole("button", { name: "Lanjut periksa hasil" })).toBeEnabled();
+  });
+
+  test("membuka ulang layar proses tidak membuat pekerjaan AI baru", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, { ...DRAFT_READY_TO_PUBLISH, generatedAt: null, contentReviewedAt: null });
+
+    let generationRequests = 0;
+    await stubApi(page, "GET", "/products/:id/jobs", () =>
+      apiOk({
+        jobs: [{ id: JOB_ID, kind: "copy", status: "succeeded", provider: "9router", progress: 100 }],
+        overallProgress: 100,
+      }),
+    );
+    await stubApi(page, "POST", "/products/:id/generate", () => {
+      generationRequests += 1;
+      return apiOk({ jobs: [] });
+    });
+
+    await openStep(page, "/create/process");
+    await expect(page.getByRole("button", { name: "Lanjut periksa hasil" })).toBeEnabled();
+    await page.waitForTimeout(500);
+    expect(generationRequests).toBe(0);
+  });
+
+  test("halaman terbit tetap menampilkan katalog sesudah dimuat ulang", async ({ page }) => {
+    await stubMainFlow(page, { ...DRAFT_READY_TO_PUBLISH, publishedAt: Date.now(), slug: SLUG });
+
+    await openStep(page, "/create/publish");
+
+    await expect(page.getByText("Katalog Anda sudah terbit dan dapat dilihat pembeli.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Buka katalog pembeli" })).toBeVisible();
+  });
+
   test("menyelesaikan enam langkah dari foto sampai terbit", async ({ page }) => {
     await stubMainFlow(page, { ...DRAFT_READY_TO_PUBLISH, transcriptReviewed: false, generatedAt: null, contentReviewedAt: null });
 
@@ -264,6 +416,15 @@ test.describe("TC-E2E-01 alur utama", () => {
 
     await expect(page.getByText("Katalog Anda sudah terbit dan dapat dilihat pembeli.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Buka katalog pembeli" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unduh foto studio" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Salin caption" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Salin cerita produk" })).toBeEnabled();
+
+    const buyerPageOpened = page.context().waitForEvent("page");
+    await page.getByRole("button", { name: "Buka katalog pembeli" }).click();
+    const buyerPage = await buyerPageOpened;
+    await expect(buyerPage).toHaveURL(new RegExp(`/catalog/${SLUG}$`));
+    await buyerPage.close();
   });
 
   test("setiap langkah memakai kalimat panduan, bukan nama fitur", async ({ page }) => {
@@ -550,12 +711,8 @@ test.describe("TC-E2E-06 katalog publik", () => {
 
   test("produk yang tidak terbit menghasilkan 404, bukan 403", async ({ page }) => {
     // Kontrak API bagian 10: `403` membocorkan keberadaan produk.
-    await page.unroute(`${"**"}/api/v1/public/catalog/*`);
-    await stubApi(page, "GET", "/public/catalog/:slug", () =>
-      apiErrorBody("NOT_FOUND", "Halaman tidak ditemukan.", "GO_BACK", 404),
-    );
-
-    await page.goto(`/catalog/${SLUG}`);
+    const response = await page.goto("/catalog/tidak-ada");
+    expect(response?.status()).toBe(404);
 
     // Next.js memetakan `notFound()` ke halaman 404-nya sendiri.
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

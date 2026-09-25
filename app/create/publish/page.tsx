@@ -37,40 +37,35 @@ export default function PublishPage(): React.JSX.Element {
   const [consentGiven, setConsentGiven] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<StepError | null>(null);
-  const [slug, setSlug] = useState<string | null>(draft?.slug ?? null);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [studioUrl, setStudioUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState<string | null>(null);
   const [story, setStory] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const productId = draft?.productId ?? null;
+  const slug = publishedSlug ?? draft?.slug ?? null;
 
   useEffect(() => {
-    void loadResult();
-  }, []);
-
-  if (draft === null) return <StepLoading />;
-
-  const productId = draft.productId;
-  const published = draft.publishedAt !== null && slug !== null;
-
-  async function loadResult(): Promise<void> {
-    // Paket siap posting (foto + teks) diambil sekali saat layar dibuka.
-    // Tanpa ini, layar akhir hanya berisi tautan — padahal tujuan produk
-    // adalah katalog yang diunduh dan disalin untuk diposting manual.
     if (productId === null) return;
     const token = readAccessToken();
     if (token === null) return;
 
-    const result = await getProduct(token, productId);
-    if (!result.ok) return;
+    void getProduct(token, productId).then((result) => {
+      if (!result.ok) return;
 
-    const photo =
-      result.data.media.find((item) => item.kind === "photo_studio" && item.isPrimary) ??
-      result.data.media.find((item) => item.kind === "photo_studio") ??
-      result.data.media.find((item) => item.kind === "photo_original");
-    setStudioUrl(photo?.url ?? null);
-    setCaption(result.data.content["id"]?.socialCopy ?? null);
-    setStory(result.data.content["id"]?.story ?? null);
-  }
+      const photo =
+        result.data.media.find((item) => item.kind === "photo_studio" && item.isPrimary) ??
+        result.data.media.find((item) => item.kind === "photo_studio") ??
+        result.data.media.find((item) => item.kind === "photo_original");
+      setStudioUrl(photo?.url ?? null);
+      setCaption(result.data.content["id"]?.socialCopy ?? null);
+      setStory(result.data.content["id"]?.story ?? null);
+    });
+  }, [productId]);
+
+  if (draft === null) return <StepLoading />;
+
+  const published = draft.publishedAt !== null && slug !== null;
 
   async function downloadPhoto(): Promise<void> {
     if (studioUrl === null) return;
@@ -146,7 +141,7 @@ export default function PublishPage(): React.JSX.Element {
       return;
     }
 
-    setSlug(result.data.slug ?? null);
+    setPublishedSlug(result.data.slug ?? null);
     update({ publishedAt: Date.now(), slug: result.data.slug ?? null });
 
     /*

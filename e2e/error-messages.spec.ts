@@ -120,6 +120,9 @@ function triggerFor(code: string): Trigger | null {
       openScreen: async (page) => {
         await seedAccessToken(page);
         await seedDraft(page, DRAFT_AT_PROCESS);
+        await stubApi(page, "GET", "/products/:id/jobs", () =>
+          apiOk({ jobs: [], overallProgress: 0 }),
+        );
         await openStep(page, "/create/process");
       },
       trigger: async () => undefined,
@@ -135,6 +138,9 @@ function triggerFor(code: string): Trigger | null {
       openScreen: async (page) => {
         await seedAccessToken(page);
         await seedDraft(page, DRAFT_AT_PUBLISH);
+        await stubApi(page, "GET", "/products/:id", () =>
+          apiOk({ content: {}, media: [] }),
+        );
         // Persetujuan diberikan lebih dulu, sehingga yang gagal adalah
         // penerbitannya — bukan penjagaan kotak centangnya.
         await stubApi(page, "POST", "/consent", () => apiOk({ kind: "publication", granted: true }));
@@ -178,7 +184,7 @@ function triggerFor(code: string): Trigger | null {
       endpoint: "/products/:id",
       openScreen: async (page) => {
         await seedAccessToken(page);
-        await seedDraft(page, DRAFT_AT_PROCESS);
+        await seedDraft(page, { ...DRAFT_AT_PROCESS, generatedAt: 1_700_000_000_000 });
         await openStep(page, "/create/review");
       },
       trigger: async () => undefined,

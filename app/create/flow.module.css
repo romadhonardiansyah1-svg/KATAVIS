@@ -27,20 +27,37 @@
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  padding-block: var(--space-4) var(--space-6);
+  border-block-end: var(--border-width-strong) solid var(--border-strong);
 }
 
 /* S2-05: posisi langkah selalu terlihat. */
 .stepIndicator {
   font-size: var(--text-small);
-  color: var(--text-secondary);
-  font-weight: var(--weight-medium);
+  color: var(--action);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.01em;
 }
 
 .title {
-  font-size: var(--text-heading);
-  font-family: var(--font-story);
+  max-inline-size: 25ch;
+  font-size: var(--text-display);
+  font-family: var(--font-ui);
+}
+
+.stepTrack {
+  block-size: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.stepFill {
+  display: block;
+  block-size: 100%;
+  background: var(--action);
+  transition: inline-size var(--duration-normal) var(--ease);
 }
 
 .main {
@@ -163,6 +180,18 @@
   font-size: var(--text-body);
 }
 
+/* Radio bawaan hanya 13px lebarnya; tokens.css sudah memaksa tinggi 56px,
+   tapi lebarnya tetap 13px sehingga TC-A11Y-03 gagal. Ukuran kedua sumbu
+   disamakan dengan --touch-min agar seluruh target sentuh lolos 56x56. */
+.statusRow input[type="radio"] {
+  inline-size: var(--touch-min);
+  block-size: var(--touch-min);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: none;
+}
+
 .statusIconSuccess {
   color: var(--success);
 }
@@ -276,10 +305,14 @@
   border-radius: var(--radius-input);
   background: var(--bg-page);
   color: var(--text-primary);
-  font-family: var(--font-story);
+  font-family: var(--font-ui);
   font-size: var(--text-body-lg);
   line-height: var(--leading-relaxed);
   resize: vertical;
+}
+
+.storyField {
+  font-family: var(--font-story);
 }
 
 .hint {
@@ -325,7 +358,7 @@
 
 .cardTitle {
   font-size: var(--text-subhead);
-  font-family: var(--font-story);
+  font-family: var(--font-ui);
 }
 
 .specList {

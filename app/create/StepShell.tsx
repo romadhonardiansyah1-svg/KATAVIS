@@ -115,6 +115,9 @@ export function StepShell({
           Langkah {current.position} dari {TOTAL_STEPS}
         </p>
         <h1 className={styles.title}>{current.title}</h1>
+        <div className={styles.stepTrack} aria-hidden="true">
+          <span className={styles.stepFill} style={{ inlineSize: `${(current.position / TOTAL_STEPS) * 100}%` }} />
+        </div>
       </header>
 
       <main className={styles.main}>

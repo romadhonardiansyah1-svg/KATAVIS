@@ -62,6 +62,7 @@ export default defineConfig({
     },
     projects: [
       {
+        resolve: { alias: { "@": process.cwd() } },
         test: {
           name: "unit",
           environment: "node",

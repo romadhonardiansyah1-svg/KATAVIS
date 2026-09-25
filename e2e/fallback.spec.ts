@@ -21,6 +21,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  API_REQUEST_PATTERN,
   LIMITS,
   MEDIA_ID,
   PRODUCT_ID,
@@ -217,6 +218,9 @@ test.describe("TC-E2E-13 seluruh penyedia gambar gagal", () => {
     // tidak boleh menghapus karya pengguna.
     await seedAccessToken(page);
     await seedDraft(page, DRAFT_AT_PROCESS);
+    await stubApi(page, "GET", "/products/:id/jobs", () =>
+      apiOk({ jobs: [], overallProgress: 0 }),
+    );
     await stubApi(page, "POST", "/products/:id/generate", () => errorStub("IMAGE_GENERATE_FAILED"));
 
     await openStep(page, "/create/process");
@@ -288,7 +292,7 @@ test.describe("TC-E2E-14 jaringan putus saat merekam", () => {
     await expect(errorBanner(page)).toBeVisible();
 
     // Koneksi pulih: endpointnya dijawab lagi.
-    await page.unroute(`${"http://localhost:8787"}/**`);
+    await page.unroute(API_REQUEST_PATTERN);
     await stubApi(page, "GET", "/products/:id/transcript", () =>
       apiOk({ text: TRANSCRIPT_TEXT, locale: "id", edited: false, provider: "groq", durationMs: 31_200 }),
     );
@@ -403,6 +407,32 @@ test.describe("TC-E2E-16 tab ditutup di tengah proses", () => {
 });
 
 test.describe("TC-E2E-17 transkrip kacau dapat dikoreksi", () => {
+  test("cerita yang ditulis sendiri tidak ditimpa hasil ASR yang datang belakangan", async ({ page }) => {
+    await seedAccessToken(page);
+    await seedDraft(page, { productId: PRODUCT_ID, photoMediaId: MEDIA_ID });
+
+    let asrReady = false;
+    let transcriptRequests = 0;
+    await stubApi(page, "GET", "/products/:id/transcript", () => {
+      transcriptRequests += 1;
+      return asrReady
+        ? apiOk({ text: "Hasil ASR terlambat", locale: "id", edited: false, provider: "groq", durationMs: 30_000 })
+        : errorStub("NOT_FOUND");
+    });
+
+    await openStep(page, "/create/transcript");
+    await expect.poll(() => transcriptRequests).toBeGreaterThan(0);
+    await page.getByRole("button", { name: "Tulis cerita sendiri tanpa menunggu transkrip" }).click();
+    const transcript = page.getByLabel("Transkrip cerita Anda");
+    await transcript.fill("Cerita saya tentang tas kulit yang dijahit tangan.");
+
+    const requestsBeforeManualEdit = transcriptRequests;
+    asrReady = true;
+    await page.waitForTimeout(2_500);
+    await expect(transcript).toHaveValue("Cerita saya tentang tas kulit yang dijahit tangan.");
+    expect(transcriptRequests).toBe(requestsBeforeManualEdit);
+  });
+
   test("layar tinjau memuat transkrip yang salah dengar dan dapat disunting", async ({ page }) => {
     // ADR-008: layar ini yang menyelamatkan keadaan ketika ASR salah dengar.
     // TEST-PLAN bagian 12 menyatakan rekaman beraksen dan berderau memang

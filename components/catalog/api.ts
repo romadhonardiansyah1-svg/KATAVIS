@@ -12,10 +12,10 @@
  */
 
 import { ERROR_CATALOG, type ErrorCode } from "@/lib/errors";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
 import { PublicCatalogSchema, type PublicCatalog } from "./timeline";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8787";
 const API_PREFIX = "/api/v1";
 
 export const CATALOG_REVALIDATE_SECONDS = 60;
@@ -46,7 +46,11 @@ function failureOf(code: ErrorCode): CatalogFailure {
  */
 export async function fetchPublicCatalog(slug: string, locale?: string): Promise<CatalogResult> {
   const query = locale === undefined ? "" : `?locale=${encodeURIComponent(locale)}`;
-  const url = `${API_BASE_URL}${API_PREFIX}/public/catalog/${encodeURIComponent(slug)}${query}`;
+  const apiBaseUrl = resolveApiBaseUrl(
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
+  const url = `${apiBaseUrl}${API_PREFIX}/public/catalog/${encodeURIComponent(slug)}${query}`;
 
   let response: Response;
   try {

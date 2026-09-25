@@ -47,16 +47,22 @@ export default function TranscriptPage(): React.JSX.Element {
   useEffect(() => {
     if (productId === null || loadedRef.current) return;
 
-    // Jika pengguna melewati rekaman atau sudah ada teks di draft, langsung tampilkan
-    if (draft?.audioJobId === null || (draft?.transcript && draft.transcript.length > 0)) {
+    // Transkrip yang sudah ada di draf langsung ditampilkan tanpa menunggu.
+    // Syaratnya hanya teksnya sendiri — bukan audioJobId. Banyak draf yang
+    // valid belum punya audioJobId (ASR bisa dijalankan di luar sesi ini),
+    // dan polling tetap diperlukan agar GET /transcript benar-benar
+    // dipanggil. Tanpa polling, layar kosong dan galat ASR tidak pernah
+    // sampai ke pengguna. Ditangkap TC-E2E-17 dan error-messages ASR_*.
+    if (draft?.transcript && draft.transcript.length > 0) {
       loadedRef.current = true;
-      setText(draft?.transcript ?? "");
+      setText(draft.transcript);
       return;
     }
 
     let cancelled = false;
 
     const poll = async (): Promise<void> => {
+      if (loadedRef.current) return;
       const token = readAccessToken();
       if (token === null) {
         if (!cancelled) setError(messageOf("UNAUTHENTICATED"));
@@ -64,7 +70,7 @@ export default function TranscriptPage(): React.JSX.Element {
       }
 
       const result = await getTranscript(token, productId);
-      if (cancelled) return;
+      if (cancelled || loadedRef.current) return;
 
       if (result.ok) {
         loadedRef.current = true;

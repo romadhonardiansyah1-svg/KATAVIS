@@ -112,6 +112,14 @@ export function useCreateFlow(step: StepId): CreateFlow {
       }
 
       setDraft(loaded);
+
+      // Indikator "Tersimpan pukul ..." harus menyala begitu draf lama
+      // dimuat — bukan hanya setelah ada suntingan baru. Tanpa ini,
+      // TC-E2E-23 melihat "Belum ada perubahan" meskipun drafnya sudah
+      // pernah tersimpan sebelumnya.
+      if (loaded.updatedAt > 0) {
+        setSavedAt(loaded.updatedAt);
+      }
     });
 
     return () => {

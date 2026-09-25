@@ -102,6 +102,7 @@ export const LIMITS = {
  */
 export const API_ORIGIN = process.env.API_BASE_URL ?? "http://localhost:8787";
 export const API_PREFIX = "/api/v1";
+export const API_REQUEST_PATTERN = /^https?:\/\/[^/]+\/api\/v1\//;
 
 /**
  * Penanda untuk kasus uji yang membutuhkan Worker sungguhan.
@@ -132,8 +133,8 @@ export function apiPattern(path: string): string {
  * ada permintaan yang gagal, hanya jawaban yang salah.
  */
 function apiRouteRegex(path: string): RegExp {
-  const literal = `${API_ORIGIN}${API_PREFIX}${path}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^${literal.replace(/:([A-Za-z]+)/g, "[^/]+")}$`);
+  const literalPath = `${API_PREFIX}${path}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^https?://[^/]+${literalPath.replace(/:([A-Za-z]+)/g, "[^/]+")}$`);
 }
 
 // --- Amplop respons (kontrak API bagian 1) ---
@@ -276,7 +277,7 @@ export async function stubApiOnce(
 
 /** Memutus seluruh permintaan ke Worker — jaringan yang benar-benar putus. */
 export async function offline(page: Page): Promise<void> {
-  await page.route(`${API_ORIGIN}/**`, async (route) => {
+  await page.route(API_REQUEST_PATTERN, async (route) => {
     await route.abort("internetdisconnected");
   });
 }

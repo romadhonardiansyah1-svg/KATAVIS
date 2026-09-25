@@ -188,9 +188,13 @@ export default async function CatalogPage({
           <h1 className="catalog__name">{catalog.name}</h1>
         )}
         <p className="catalog__artisan">
-          <span>Dibuat oleh {catalog.artisan.displayName}</span>
+          <span>
+            {catalog.artisan.displayName === "Pengrajin"
+              ? "Dibuat oleh pengrajin"
+              : `Dibuat oleh ${catalog.artisan.displayName}`}
+          </span>
           <span className="catalog__artisanRole">
-            Pengrajin. Katalog ini dibuat dan diterbitkan oleh pengrajinnya sendiri.
+            Katalog ini dibuat dan diterbitkan oleh pengrajinnya sendiri.
           </span>
         </p>
       </header>
