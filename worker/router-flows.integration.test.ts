@@ -614,8 +614,8 @@ describe("router — antrian Studio Agent", () => {
   });
 
   it("menerima heartbeat dan klaim pekerjaan", async () => {
-    // Kunci diambil dari lingkungan, bukan ditulis di uji: `.dev.vars`
-    // sudah memuatnya, dan menimpa env dari pool tidak berpengaruh.
+    // Kunci berasal dari binding lingkungan: konfigurasi uji menyediakan
+    // nilai tetap, sementara pengembangan lokal boleh memakai `.dev.vars`.
     const agentKey = env.AGENT_SHARED_KEY ?? "";
 
     const heartbeat = await call("/api/v1/agent/heartbeat", {

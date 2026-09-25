@@ -477,6 +477,7 @@ test.describe("TC-E2E-02 alur tanpa mengetik", () => {
       buffer: JPEG_BYTES,
     });
     await page.getByRole("button", { name: "Lanjut rekam cerita" }).click();
+    await expect(page).toHaveURL(/\/create\/record$/);
 
     await openStep(page, "/create/transcript");
     // "Sudah benar" tanpa mengubah apa pun tetap sah (ADR-008): yang ditandai

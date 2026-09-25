@@ -29,6 +29,8 @@
   "vars": {
     "ENVIRONMENT": "development",
     "DEMO_MODE": "false",
+    // Nilai tetap untuk pengujian otorisasi agen; bukan kredensial layanan.
+    "AGENT_SHARED_KEY": "test-agent-key",
     "GEMINI_TIMEOUT_MS": "65000",
     "AGENT_HEARTBEAT_TIMEOUT_MS": "30000",
     "NINEROUTER_TEXT_MODEL": "ag/gemini-3.8-flash-high"
