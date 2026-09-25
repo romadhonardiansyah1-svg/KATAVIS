@@ -86,7 +86,10 @@ export default defineConfig({
       {
         plugins: [
           cloudflareTest({
-            wrangler: { configPath: "./wrangler.jsonc" },
+            // Tes memakai binding lokal yang sama, tanpa proxy Workers AI.
+            // Runner CI tidak punya kredensial Cloudflare dan tidak perlu
+            // menyentuh layanan AI untuk membuktikan D1/R2/Queue.
+            wrangler: { configPath: "./wrangler.test.jsonc" },
             miniflare: {
               compatibilityDate: "2026-08-22",
               compatibilityFlags: ["nodejs_compat"],
@@ -96,6 +99,9 @@ export default defineConfig({
         ],
         test: {
           name: "worker",
+          // Beberapa workerd paralel kehabisan memori pada laptop demo.
+          // CI menjalankan berkas yang sama satu per satu agar hasil stabil.
+          maxWorkers: 1,
           include: ["worker/**/*.integration.test.ts"],
         },
       },

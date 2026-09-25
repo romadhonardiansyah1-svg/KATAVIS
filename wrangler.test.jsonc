@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "katavis-test",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "katavis",
+      "database_id": "68aa4781-8289-4ac7-88d7-a99bcca0197d",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "katavis-media" }],
+  "queues": {
+    "producers": [{ "queue": "katavis-jobs", "binding": "JOBS" }],
+    "consumers": [
+      {
+        "queue": "katavis-jobs",
+        "dead_letter_queue": "katavis-jobs-dlq",
+        "max_batch_size": 5,
+        "max_retries": 3,
+        "retry_delay": 30
+      }
+    ]
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "DEMO_MODE": "false",
+    "GEMINI_TIMEOUT_MS": "65000",
+    "AGENT_HEARTBEAT_TIMEOUT_MS": "30000",
+    "NINEROUTER_TEXT_MODEL": "ag/gemini-3.8-flash-high"
+  }
+}

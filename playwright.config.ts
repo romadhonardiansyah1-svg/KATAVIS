@@ -78,9 +78,8 @@ export default defineConfig({
     },
   ],
 
-  // Di CI, server sudah berjalan sebelum Playwright dipanggil.
-  // `exactOptionalPropertyTypes` menolak `undefined` di sini, jadi
-  // properti dihilangkan sepenuhnya alih-alih diberi nilai undefined.
+  // Build dijalankan oleh langkah CI sebelumnya, tetapi proses Next belum
+  // berjalan. Playwright harus menyalakannya sebelum membuka halaman.
   //
   // Pengujian dijalankan terhadap build PRODUKSI, bukan `next dev`, karena
   // dua alasan yang diukur, bukan preferensi:
@@ -95,16 +94,12 @@ export default defineConfig({
   //
   // Build produksi juga yang dinilai juri saat demo. Harganya satu build
   // di awal (~1-3 menit di mesin ini); sesudahnya setiap rute instan.
-  ...(CI
-    ? {}
-    : {
-        webServer: {
-          command: "pnpm run build && pnpm exec next start",
-          url: "http://localhost:3000",
-          reuseExistingServer: true,
-          timeout: 360_000,
-        },
-      }),
+  webServer: {
+    command: CI ? "pnpm exec next start" : "pnpm run build && pnpm exec next start",
+    url: "http://localhost:3000",
+    reuseExistingServer: !CI,
+    timeout: 360_000,
+  },
 
   expect: {
     // Pekerjaan AI berjalan 15-70 detik (ADR-007). Timeout bawaan
